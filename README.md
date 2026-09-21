@@ -43,7 +43,7 @@ Requisitos locais: Node 20+, PHP 8.3 com PDO SQLite, GD, cURL, mbstring e filein
 | Prioridade padrão na busca | 3ª | 2ª | 1ª |
 | Logo, capa, contatos, redes e avaliações | Sim | Sim | Sim |
 
-A imagem de promoção vem da galeria. Logo e capa não consomem o limite da galeria. Não há cobrança avulsa por postagem. Maior plano amplia a vitrine, não compra notas melhores. O visitante pode ordenar por avaliação.
+A promoção aceita uma imagem própria, enviada separadamente, ou uma imagem da biblioteca do portal. O comerciante não pode excluir uma promoção publicada; a exclusão administrativa fica registrada. Logo e capa não consomem o limite da galeria. Não há cobrança avulsa por postagem. Maior plano amplia a vitrine, não compra notas melhores. O visitante pode ordenar por avaliação.
 
 ## Integrações e credenciais
 
@@ -57,7 +57,7 @@ Copie `.env.example` para `.env` e preencha somente os serviços que pretende at
 | WhatsApp automático | conta/chave Twilio, remetente e modelo aprovado | Fila sem envio |
 | Agendador | executar `scripts/worker.php` a cada 5 minutos | Não instalado no SO automaticamente |
 
-O portal não realiza Pix diretamente para uma chave pessoal. A cobrança é emitida pela conta Asaas vinculada ao desenvolvedor, sujeita à habilitação, tarifas e política de recebimento do provedor. Configure essa conta antes de cobrar qualquer comerciante.
+Nesta primeira versão, o portal gera Pix com valor fixo usando a chave pessoal cadastrada pelo administrador. A confirmação é manual, exige conferência no extrato e ativa o plano após o registro do recebimento.
 
 ## Validação
 
@@ -81,3 +81,4 @@ Os testes da API usam banco SQLite isolado e simulam a operação financeira. Os
 - [Privacidade e LGPD](docs/LGPD.md)
 - [Divulgação no WhatsApp](docs/DIVULGACAO.md)
 - [Histórico e pendências de homologação](docs/DESENVOLVIMENTO.md)
+
