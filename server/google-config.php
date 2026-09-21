@@ -1,0 +1,13 @@
+<?php
+function googleBaseUrl(): string {return rtrim(env('GOOGLE_BASE_URL',env('APP_URL','http://localhost:8080')),'/');}
+function googleRedirectUri(): string {return googleBaseUrl().'/api/auth/google/callback';}
+function googleLoginEnabled(): bool {return env('GOOGLE_LOGIN_ENABLED','true')==='true'&&env('GOOGLE_CLIENT_ID')!==''&&env('GOOGLE_CLIENT_SECRET')!=='';}
+function googleSettings(): array {return ['enabled'=>googleLoginEnabled(),'client_id'=>env('GOOGLE_CLIENT_ID'),'secret_configured'=>env('GOOGLE_CLIENT_SECRET')!=='','base_url'=>googleBaseUrl(),'redirect_uri'=>googleRedirectUri()];}
+function saveGoogleSettings(array $d,int $admin): void {
+ $client=field($d,'client_id',0,255);$secret=field($d,'client_secret',0,500);$url=rtrim(field($d,'base_url',1,500),'/');$parts=parse_url($url);
+ if(!filter_var($url,FILTER_VALIDATE_URL)||!$parts||isset($parts['user'])||isset($parts['pass'])||isset($parts['query'])||isset($parts['fragment'])||!empty($parts['path'])||!in_array($parts['scheme']??'',['http','https']))fail('Informe apenas a origem do portal, como https://seu-dominio.com, sem caminho ou parâmetros.');
+ if(($parts['scheme']??'')!=='https'&&(env('APP_ENV','local')==='production'||!in_array(strtolower($parts['host']??''),['localhost','127.0.0.1','[::1]'])))fail('Use HTTPS; HTTP é permitido apenas em localhost no desenvolvimento.');
+ if($client&&!preg_match('/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/',$client))fail('Informe o Client ID completo, terminado em .apps.googleusercontent.com.');if($secret&&preg_match('/[\s\x00]/',$secret))fail('O Client Secret não pode conter espaços ou quebras de linha.');
+ $file=integrationConfigPath();$lock=fopen($file.'.lock','c');if(!$lock||!flock($lock,LOCK_EX))fail('Não foi possível salvar a configuração.',500);
+ try{$config=integrationConfig();if($client!==env('GOOGLE_CLIENT_ID')&&!$secret)fail('Ao trocar o Client ID, informe também o Client Secret correspondente.');$config['GOOGLE_CLIENT_ID']=$client;if($secret)$config['GOOGLE_CLIENT_SECRET']=$secret;$config['GOOGLE_BASE_URL']=$url;$config['GOOGLE_LOGIN_ENABLED']=!empty($d['enabled'])?'true':'false';if($config['GOOGLE_LOGIN_ENABLED']==='true'&&(!$client||!($config['GOOGLE_CLIENT_SECRET']??env('GOOGLE_CLIENT_SECRET'))))fail('Informe Client ID e Client Secret antes de habilitar o login Google.');$tmp=tempnam(dirname($file),'google-');if($tmp===false)fail('Não foi possível salvar.',500);chmod($tmp,0600);if(file_put_contents($tmp,json_encode($config,JSON_THROW_ON_ERROR),LOCK_EX)===false||!rename($tmp,$file)){@unlink($tmp);fail('Não foi possível salvar.',500);}chmod($file,0600);audit($admin,null,'google_settings_updated','Configuração do login Google atualizada; segredo omitido.');}finally{flock($lock,LOCK_UN);fclose($lock);}
+}

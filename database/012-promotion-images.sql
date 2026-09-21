@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS promotion_images (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ business_id INTEGER NOT NULL,
+ url VARCHAR(500) NOT NULL UNIQUE,
+ created_at DATETIME NOT NULL,
+ FOREIGN KEY(business_id) REFERENCES businesses(id)
+);
+

@@ -1,0 +1,42 @@
+<?php
+// Public ads never expose payment evidence or private account data.
+function publicAdvertisements(): array {
+ $now=date('Y-m-d H:i:s');$rows=query("SELECT a.* FROM advertisements a JOIN businesses b ON b.id=a.business_id WHERE a.status='active' AND a.paid_at IS NOT NULL AND a.starts_at<=? AND a.expires_at>? AND b.status<>'suspended' AND b.approval_status='approved' ORDER BY a.id DESC",[$now,$now])->fetchAll();$items=[];
+ foreach($rows as $a){$b=one('SELECT * FROM businesses WHERE id=?',[$a['business_id']]);if(!isListed($b))continue;$items[]=['id'=>$a['id'],'business_id'=>$b['id'],'business_code'=>businessCode((int)$b['id']),'business_name'=>$b['name'],'title'=>$a['title'],'description'=>$a['description'],'image_url'=>$a['image_url'],'logo_url'=>$a['logo_url'],'offer_price_cents'=>$a['offer_price_cents'],'phone'=>$b['phone'],'maps_url'=>$b['publish_address']?$b['maps_url']:'','listed'=>isListed($b),'expires_at'=>$a['expires_at']];}return $items;
+}
+function adMonthEnd(string $start): string {
+ $date=new DateTimeImmutable($start);$next=$date->modify('first day of next month');$day=min((int)$date->format('d'),(int)$next->format('t'));return $next->setDate((int)$next->format('Y'),(int)$next->format('m'),$day)->format('Y-m-d H:i:s');
+}
+function advertisementRoutes(string $path,string $method): void {
+ if($path==='/api/advertisements'&&$method==='GET')jsonResponse(publicAdvertisements());
+ if(!str_starts_with($path,'/api/admin/advertisements'))return;
+ $admin=adminUser();
+ if($path==='/api/admin/advertisements'&&$method==='POST'){
+  $d=input();$code=strtoupper(field($d,'business_code',1,30));if(!preg_match('/^(?:SZ-)?0*([1-9][0-9]*)$/',$code,$m))fail('Informe o código do negócio, como SZ-000001.');$b=one('SELECT * FROM businesses WHERE id=?',[(int)$m[1]]);if(!$b)fail('Código de negócio não encontrado.',404);
+  $title=field($d,'title',3,100);$description=field($d,'description',5,600);$amount=priceInCents($d['monthly_amount']??'');$offer=isset($d['offer_price'])&&$d['offer_price']!==''?priceInCents($d['offer_price']):null;
+  $id=transaction(function()use($b,$title,$description,$amount,$offer,$admin){query('INSERT INTO advertisements(business_id,title,description,monthly_amount_cents,offer_price_cents,created_at) VALUES(?,?,?,?,?,?)',[$b['id'],$title,$description,$amount,$offer,date('Y-m-d H:i:s')]);$id=(int)db()->lastInsertId();audit((int)$admin['id'],(int)$b['id'],'ad_created','Publicidade #'.$id.' para '.businessCode((int)$b['id']));return $id;});jsonResponse(one('SELECT * FROM advertisements WHERE id=?',[$id]),201);
+ }
+ if(!preg_match('#^/api/admin/advertisements/(\d+)(?:/(image|activate|pause|resume|renew))?$#',$path,$m))fail('Publicidade não encontrada.',404);
+ $id=(int)$m[1];$action=$m[2]??'';$a=one('SELECT * FROM advertisements WHERE id=?',[$id]);if(!$a)fail('Publicidade não encontrada.',404);
+ if($method==='POST'&&$action==='image'){
+  $kind=$_POST['kind']??'image';if(!in_array($kind,['image','logo']))fail('Tipo de imagem inválido.');$f=$_FILES['photo']??null;if(!$f||$f['error']!==UPLOAD_ERR_OK||$f['size']>5*1024*1024)fail('Envie JPG, PNG ou WebP de até 5 MB.');$info=@getimagesize($f['tmp_name']);if(!$info||!in_array($info['mime'],['image/jpeg','image/png','image/webp'])||$info[0]*$info[1]>20000000)fail('Imagem inválida ou superior a 20 megapixels.');$source=@imagecreatefromstring(file_get_contents($f['tmp_name']));if(!$source)fail('Não foi possível abrir a imagem.');$w=$kind==='logo'?400:900;$h=$kind==='logo'?400:600;$target=imagecreatetruecolor($w,$h);imagefill($target,0,0,imagecolorallocate($target,255,255,255));$scale=min($w/$info[0],$h/$info[1]);$sw=(int)round($info[0]*$scale);$sh=(int)round($info[1]*$scale);imagecopyresampled($target,$source,(int)(($w-$sw)/2),(int)(($h-$sh)/2),0,0,$sw,$sh,$info[0],$info[1]);$url='/uploads/'.bin2hex(random_bytes(16)).'.jpg';if(!imagejpeg($target,ROOT.'/public'.$url,85))fail('Não foi possível salvar a imagem.',500);imagedestroy($source);imagedestroy($target);
+  transaction(function()use($kind,$url,$id,$a,$admin){query('UPDATE advertisements SET '.($kind==='logo'?'logo_url':'image_url').'=? WHERE id=?',[$url,$id]);audit((int)$admin['id'],(int)$a['business_id'],'ad_image','Imagem da publicidade #'.$id.' atualizada');});jsonResponse(['url'=>$url]);
+ }
+ if($method!=='POST')fail('Método não permitido.',405);
+ $d=input();$result=transaction(function()use($id,$action,$d,$admin){query('UPDATE advertisements SET id=id WHERE id=?',[$id]);$a=one('SELECT * FROM advertisements WHERE id=?',[$id]);$b=one('SELECT * FROM businesses WHERE id=?',[$a['business_id']]);
+  if($action==='activate'){
+   if($a['paid_at'])fail('Recebimento já confirmado. Para outro mês, crie uma renovação.',409);
+   if(!$a['image_url'])fail('Envie a imagem da publicidade antes de ativar.');if($b['status']==='suspended')fail('O negócio está suspenso.');if(empty($d['checked']))fail('Confira o recebimento no extrato antes de ativar.');$amount=priceInCents($d['amount']??'');if($amount!==(int)$a['monthly_amount_cents'])fail('O valor deve corresponder ao valor mensal combinado.');$ref=strtoupper(field($d,'reference',10,100));if(!preg_match('/^[A-Z0-9-]+$/',$ref))fail('Informe o identificador Pix sem espaços.');
+   // Serialize confirmations across advertisements and plan payments, including different businesses.
+   query('UPDATE settings SET value=value WHERE setting_key=?',['support_whatsapp']);if(one('SELECT id FROM advertisements WHERE bank_reference=?',[$ref])||one('SELECT payment_id FROM manual_pix_payments WHERE bank_reference=?',[$ref]))fail('Este identificador já foi utilizado.',409);
+   $date=field($d,'paid_date',10,10);$parsed=DateTimeImmutable::createFromFormat('!Y-m-d',$date);if(!$parsed||$parsed->format('Y-m-d')!==$date||$date>date('Y-m-d'))fail('Informe a data real do recebimento.');$start=date('Y-m-d H:i:s');$end=adMonthEnd($start);query("UPDATE advertisements SET status='active',starts_at=?,expires_at=?,paid_at=?,bank_reference=?,confirmed_by=? WHERE id=?",[$start,$end,$date.' 12:00:00',$ref,$admin['id'],$id]);
+  }elseif($action==='pause'){query("UPDATE advertisements SET status='paused' WHERE id=?",[$id]);
+  }elseif($action==='resume'){if(!$a['paid_at']||$a['expires_at']<=date('Y-m-d H:i:s')||$b['status']==='suspended')fail('Só é possível retomar uma publicidade paga, vigente e de negócio não suspenso.');query("UPDATE advertisements SET status='active' WHERE id=?",[$id]);
+  }elseif($action==='renew'){
+   if(!$a['paid_at']||$a['expires_at']>date('Y-m-d H:i:s'))fail('Crie a renovação após o término do período atual.');query('INSERT INTO advertisements(business_id,title,description,image_url,logo_url,offer_price_cents,monthly_amount_cents,created_at) VALUES(?,?,?,?,?,?,?,?)',[$a['business_id'],$a['title'],$a['description'],$a['image_url'],$a['logo_url'],$a['offer_price_cents'],$a['monthly_amount_cents'],date('Y-m-d H:i:s')]);$newId=(int)db()->lastInsertId();audit((int)$admin['id'],(int)$a['business_id'],'ad_renewal','Rascunho #'.$newId.' baseado na publicidade #'.$id);return one('SELECT * FROM advertisements WHERE id=?',[$newId]);
+  }elseif($action===''){
+   $title=field($d,'title',3,100);$description=field($d,'description',5,600);$offer=isset($d['offer_price'])&&$d['offer_price']!==''?priceInCents($d['offer_price']):null;$amount=$a['paid_at']?(int)$a['monthly_amount_cents']:priceInCents($d['monthly_amount']??'');query('UPDATE advertisements SET title=?,description=?,offer_price_cents=?,monthly_amount_cents=? WHERE id=?',[$title,$description,$offer,$amount,$id]);
+  }else fail('Ação inválida.',404);
+  audit((int)$admin['id'],(int)$a['business_id'],'ad_'.($action?:'updated'),'Publicidade #'.$id.' · '.businessCode((int)$a['business_id']));return one('SELECT * FROM advertisements WHERE id=?',[$id]);
+ });jsonResponse($result);
+}

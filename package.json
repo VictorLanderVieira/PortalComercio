@@ -1,0 +1,26 @@
+{
+  "name": "sarzedo-por-perto",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "setup": "node scripts/assets.cjs && php -d extension=pdo_sqlite scripts/migrate.php && php -d extension=pdo_sqlite scripts/seed.php && php -d extension=pdo_sqlite scripts/demo.php && php scripts/icons.php",
+    "start": "php -d extension=pdo_sqlite -S localhost:8080 -t public server/router.php",
+    "test": "php -d extension=pdo_sqlite tests/payment-unit.php && node --test tests/api.test.cjs",
+    "test:ui": "playwright test",
+    "build": "node scripts/assets.cjs && php scripts/icons.php",
+    "release": "php scripts/verify-safe-migrations.php && node scripts/package-release.cjs",
+    "check:php": "node scripts/check-php.cjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Portal local de empresas e autônomos de Sarzedo",
+  "dependencies": {
+    "angular": "1.8.3",
+    "qrcode-generator": "^2.0.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  },
+  "private": true
+}

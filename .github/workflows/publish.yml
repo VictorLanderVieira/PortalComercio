@@ -1,0 +1,103 @@
+name: Publicar portal
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Ambiente de destino
+        required: true
+        type: choice
+        options: [staging, production]
+        default: staging
+      mode:
+        description: Primeira instalação ou atualização
+        required: true
+        type: choice
+        options: [update, initialize]
+        default: update
+permissions:
+  contents: read
+concurrency:
+  group: portal-${{ github.event_name == 'push' && 'production' || inputs.target }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    environment: ${{ github.event_name == 'push' && 'production' || inputs.target }}
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-password
+          MYSQL_DATABASE: portal_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -pci-only-password"
+          --health-interval=10s --health-timeout=5s --health-retries=15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Preparar PHP
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y php8.3-cli php8.3-mysql php8.3-sqlite3 php8.3-gd php8.3-curl php8.3-mbstring mysql-client
+      - run: npm ci
+      - run: npm run check:php
+      - run: npm test
+      - run: npx playwright install --with-deps chrome
+      - run: npm run test:ui
+      - name: Validar MySQL e backup em banco isolado
+        env:
+          DB_DRIVER: mysql
+          DB_HOST: 127.0.0.1
+          DB_DATABASE: portal_test
+          DB_USERNAME: root
+          DB_PASSWORD: ci-only-password
+          MYSQL_PWD: ci-only-password
+        run: |
+          php scripts/migrate.php
+          php scripts/migrate.php
+          mkdir -p dist
+          php scripts/backup-db.php dist/ci-database.sql.gz
+          mysql -h 127.0.0.1 -u root -e "CREATE DATABASE portal_restore CHARACTER SET utf8mb4"
+          gzip -dc dist/ci-database.sql.gz | mysql -h 127.0.0.1 -u root portal_restore
+          test "$(mysql -N -h 127.0.0.1 -u root portal_restore -e 'SELECT MAX(version) FROM schema_migrations')" = "13"
+      - run: npm run release
+      - name: Configurar conexão SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Publicar no servidor
+        env:
+          HOST: ${{ secrets.SSH_HOST }}
+          USER: ${{ secrets.SSH_USER }}
+          PORT: ${{ secrets.SSH_PORT }}
+          BASE: ${{ secrets.DEPLOY_PATH }}
+          MODE: ${{ github.event_name == 'push' && 'update' || inputs.mode }}
+          TARGET: ${{ github.event_name == 'push' && 'production' || inputs.target }}
+        run: |
+          [[ "$HOST" =~ ^[a-zA-Z0-9.-]+$ && "$USER" =~ ^[a-zA-Z0-9_-]+$ && "$PORT" =~ ^[0-9]+$ && "$BASE" =~ ^/[a-zA-Z0-9_./-]+$ ]] || exit 1
+          [[ "$BASE" != *..* && "$BASE" != / && "$BASE" != *public_html* ]] || exit 1
+          ssh -p "$PORT" "$USER@$HOST" "mkdir -p '$BASE/incoming'"
+          scp -P "$PORT" dist/portal-release.tar.gz dist/portal-release.tar.gz.sha256 infra/deploy/deploy.sh "$USER@$HOST:$BASE/incoming/"
+          ssh -p "$PORT" "$USER@$HOST" "cd '$BASE' && bash incoming/deploy.sh '$MODE' '$TARGET'"
+      - name: Verificar resposta pública
+        env:
+          PORTAL_URL: ${{ vars.PORTAL_URL }}
+          HTTP_USER: ${{ secrets.HTTP_BASIC_USER }}
+          HTTP_PASSWORD: ${{ secrets.HTTP_BASIC_PASSWORD }}
+        run: |
+          [[ "$PORTAL_URL" == https://* ]] || exit 1
+          args=()
+          if [[ -n "$HTTP_USER" ]]; then args+=(--user "$HTTP_USER:$HTTP_PASSWORD"); fi
+          curl --fail --silent --show-error --retry 3 "${args[@]}" "$PORTAL_URL/api/catalog" -o /tmp/catalog.json
+          php -r '$d=json_decode(file_get_contents("/tmp/catalog.json"),true); if(!isset($d["plans"],$d["categories"]))exit(1);'

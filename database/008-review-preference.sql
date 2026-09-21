@@ -1,0 +1,1 @@
+ALTER TABLE businesses ADD COLUMN reviews_opt_in INTEGER NOT NULL DEFAULT 1;

@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS manual_pix_payments (payment_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, recipient_name VARCHAR(25) NOT NULL, txid VARCHAR(25) NOT NULL UNIQUE, bank_reference VARCHAR(100) NULL UNIQUE, confirmed_by INTEGER NULL, confirmed_at DATETIME NULL, FOREIGN KEY(payment_id) REFERENCES payments(id), FOREIGN KEY(confirmed_by) REFERENCES users(id));
