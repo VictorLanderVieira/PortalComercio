@@ -28,3 +28,7 @@ if(!one('SELECT version FROM schema_migrations WHERE version=11')){db()->exec(fi
 if(!one('SELECT version FROM schema_migrations WHERE version=12')){$sql=file_get_contents(ROOT.'/database/012-promotion-images.sql');if(env('DB_DRIVER','sqlite')==='mysql')$sql=str_replace('INTEGER PRIMARY KEY AUTOINCREMENT','INTEGER PRIMARY KEY AUTO_INCREMENT',$sql);db()->exec($sql);query('INSERT INTO schema_migrations VALUES(12,?)',[date('Y-m-d H:i:s')]);echo "Imagens próprias de promoções adicionadas.\n";}
 
 if(!one('SELECT version FROM schema_migrations WHERE version=13')){db()->exec(file_get_contents(ROOT.'/database/013-support-whatsapp.sql'));query('INSERT INTO schema_migrations VALUES(13,?)',[date('Y-m-d H:i:s')]);echo "WhatsApp de atendimento atualizado.\n";}
+
+if(!one('SELECT version FROM schema_migrations WHERE version=14')){db()->exec(file_get_contents(ROOT.'/database/014-business-minisite.sql'));query('INSERT INTO schema_migrations VALUES(14,?)',[date('Y-m-d H:i:s')]);echo "Conteúdo do minisite empresarial adicionado.\n";}
+
+if(!one('SELECT version FROM schema_migrations WHERE version=15')){db()->exec(file_get_contents(ROOT.'/database/015-advertisement-creative-mode.sql'));query('INSERT INTO schema_migrations VALUES(15,?)',[date('Y-m-d H:i:s')]);echo "Modos de criação de publicidade adicionados.\n";}
