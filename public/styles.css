@@ -95,3 +95,5 @@
 .map-unavailable{background:#f3f7f0;border:1px solid var(--line);border-radius:12px;padding:25px;line-height:1.6}.map-unavailable strong{color:var(--green)}.map-unavailable p{margin:8px 0 0}
 
 .owner-review{border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-top:15px;background:#fbfcf9}.owner-review-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.owner-review-head strong{display:block}.owner-review-head .review-stars{font-size:17px}.owner-review-head small{display:block;color:var(--muted);margin-top:5px}.owner-review>p{margin:14px 0 0;font-size:13px;line-height:1.6}@media(max-width:540px){.owner-review-head{flex-direction:column;gap:8px}}
+
+.post-image,.post-image-preview img{display:block;width:100%;max-height:430px;object-fit:contain;background:#edf3eb;border-radius:10px;margin:0 0 15px}.post-image-preview{margin:4px 0 18px}.post-image-preview img{max-height:300px}.post-image-preview .text-button{font-size:12px}

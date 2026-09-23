@@ -34,6 +34,8 @@ Premium (R$ 100): 25 fotos, 20 novidades/mês, 5 promoções simultâneas, prime
 
 Limites são conferidos no backend. Limpar uma foto permite substituí-la. Publicações contam pelo mês-calendário. Promoções contam enquanto sua validade não terminou; podem ser removidas. Expiração máxima de promoção: 90 dias. Só um anúncio com licença/degustação/cortesia vigente pode publicar novidades e promoções.
 
+Cada publicação pode incluir uma imagem opcional, enviada em JPG, PNG ou WebP de até 5 MB. O servidor redimensiona a imagem para no máximo 1600 px no maior lado e a armazena como JPEG. Publicações sem imagem continuam válidas; a imagem não consome uma vaga adicional da galeria, mas a publicação continua sujeita ao limite mensal do plano.
+
 O plano não garante vendas, impressão mínima nem exclusividade por categoria. A ordenação padrão é prioridade do plano, média das avaliações e nome. O visitante pode selecionar melhor avaliação, ignorando a prioridade comercial. Avaliações vão de 1 a 5, requerem conta, são únicas por conta/empresa e não podem ser feitas pelo proprietário da vitrine.
 
 ## WhatsApp e autônomos
