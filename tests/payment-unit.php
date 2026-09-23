@@ -7,11 +7,23 @@ $calls=0;$failProvider=false;
 function externalJson(string $url,string $method='GET',array $headers=[],?string $body=null):array{global $calls,$failProvider;$calls++;if($failProvider)throw new RuntimeException('Provedor externo indisponível (HTTP 503).');return ['id'=>'email-mock-'.$calls,'sid'=>'whatsapp-mock-'.$calls];}
 $now=date('Y-m-d H:i:s');query('INSERT INTO users(name,email,password_hash,created_at) VALUES(?,?,?,?)',['Unit','unit@example.test',password_hash('ExampleTestOnly!2026',PASSWORD_DEFAULT),$now]);$uid=db()->lastInsertId();query("INSERT INTO businesses(user_id,category_id,plan_id,interest_plan_id,name,description,purpose,neighborhood,address,phone,notification_channel,whatsapp_consent,created_at,status) VALUES(?,7,2,3,'Unit business','Descrição suficiente para teste','','Centro','Rua local','31999999999','both',1,?,'pending')",[$uid,$now]);$bid=(int)db()->lastInsertId();query("INSERT INTO subscriptions(business_id,plan_id,provider_id,billing_type,status,created_at) VALUES(?,2,'sub_unit','PIX','pending',?)",[$bid,$now]);
 check(substr(nextMonth('2026-01-31 23:59:59'),0,10)==='2026-02-28','Mês civil em janeiro');check(substr(nextMonth('2028-01-31 23:59:59'),0,10)==='2028-02-29','Ano bissexto');
-$p=['id'=>'payment_one','subscription'=>'sub_unit','value'=>75,'dueDate'=>date('Y-m-d'),'paymentDate'=>date('Y-m-d'),'status'=>'RECEIVED'];applyPayment($p);$first=one('SELECT * FROM businesses WHERE id=?',[$bid]);check(isLive($first),'Pagamento ativa acesso');applyPayment($p);check(one('SELECT * FROM businesses WHERE id=?',[$bid])['paid_until']===$first['paid_until'],'Pagamento duplicado não estende acesso');
+$p=['id'=>'payment_one','subscription'=>'sub_unit','value'=>75,'dueDate'=>date('Y-m-d'),'paymentDate'=>date('Y-m-d'),'status'=>'RECEIVED'];
+applyPayment(array_merge($p,['status'=>'CONFIRMED']));
+check(!isLive(one('SELECT * FROM businesses WHERE id=?',[$bid])),'CONFIRMED temporário não libera plano de conta PF');
+applyPayment($p);$first=one('SELECT * FROM businesses WHERE id=?',[$bid]);check(isLive($first),'RECEIVED ativa acesso');applyPayment($p);check(one('SELECT * FROM businesses WHERE id=?',[$bid])['paid_until']===$first['paid_until'],'Pagamento duplicado não estende acesso');
+check(!isListed($first),'Primeiro Pix pago não aprova nem publica o cadastro');
+query("UPDATE businesses SET approval_status='approved' WHERE id=?",[$bid]);
+check(isListed(one('SELECT * FROM businesses WHERE id=?',[$bid])),'Aprovação administrativa publica o período já pago');
 try{applyPayment(array_merge($p,['id'=>'wrong_amount','value'=>1]));throw new RuntimeException('Valor incorreto aceito');}catch(RuntimeException $e){check($e->getMessage()==='Valor divergente','Recusa valor divergente');}
 applyPayment(array_merge($p,['status'=>'REFUNDED']));$ref=one("SELECT * FROM payments WHERE provider_id='payment_one'");check($ref['paid_at']!==null&&$ref['refunded_at']!==null,'Estorno preserva histórico de recebimento');check(!isLive(one('SELECT * FROM businesses WHERE id=?',[$bid])),'Estorno retira acesso pago');
 applyPayment(array_merge($p,['id'=>'payment_two']));check(isLive(one('SELECT * FROM businesses WHERE id=?',[$bid])),'Outra cobrança paga permite acesso');applyPayment(array_merge($p,['status'=>'REFUNDED']));check(isLive(one('SELECT * FROM businesses WHERE id=?',[$bid])),'Estorno antigo não apaga outro período pago');
 query("UPDATE businesses SET status='suspended' WHERE id=?",[$bid]);applyPayment(array_merge($p,['id'=>'payment_two']));check(!isLive(one('SELECT * FROM businesses WHERE id=?',[$bid])),'Webhook não remove suspensão');query("UPDATE businesses SET status='active' WHERE id=?",[$bid]);
+$beforeRenewal=one('SELECT paid_until FROM businesses WHERE id=?',[$bid])['paid_until'];
+$renewalDue=substr(nextMonth(date('Y-m-d').' 23:59:59'),0,10);
+applyPayment(array_merge($p,['id'=>'payment_renewal','dueDate'=>$renewalDue]));
+$renewed=one('SELECT * FROM businesses WHERE id=?',[$bid]);
+check($renewed['paid_until']>$beforeRenewal,'Novo Pix da assinatura renova o prazo automaticamente');
+check(isListed($renewed)&&$renewed['approval_status']==='approved','Renovação mantém aprovação sem revisão adicional');
 putenv('NOTIFICATION_MODE=automatic');
 foreach(['NOTIFICATIONS_ENABLED'=>'true','RESEND_API_KEY'=>'mock','EMAIL_FROM'=>'mock@example.test','TWILIO_ACCOUNT_SID'=>'mock','TWILIO_API_KEY'=>'mock','TWILIO_API_SECRET'=>'mock','TWILIO_WHATSAPP_FROM'=>'whatsapp:+5500000000000','TWILIO_CONTENT_SID'=>'mock']as$k=>$v)putenv($k.'='.$v);
 $b=one('SELECT * FROM businesses WHERE id=?',[$bid]);queueNotice($b,'notification-unit','Aviso para teste');queueNotice($b,'notification-unit','Aviso para teste');check((int)one("SELECT COUNT(*) n FROM notifications WHERE dedup_key='notification-unit'")['n']===1,'Avisos deduplicados');$result=runDeliveries();check($result['sent']>=2,'Ambos os canais são enviados por adaptador mock');$before=$calls;runDeliveries();check($calls===$before,'Envio não se repete');
@@ -23,4 +35,13 @@ query('UPDATE businesses SET paid_until=NULL,trial_until=NULL,manual_until=?,wha
 $known='00020126580014br.gov.bcb.pix0136123e4567-e12b-12d1-a456-4266554400005204000053039865802BR5913Fulano de Tal6008BRASILIA62070503***6304';check(pixCrc($known)==='1D3D','CRC Pix validado com exemplo oficial do Banco Central');
 require __DIR__.'/../server/metrics.php';putenv('ANALYTICS_ENABLED=true');$_SESSION=[];$_SERVER['HTTP_USER_AGENT']='Browser de teste';recordPortalMetric(['type'=>'visit']);recordPortalMetric(['type'=>'visit']);check(publicMetrics()['visits']===1,'Atualizações na mesma sessão não duplicam visitas');$_SESSION['metric_activity']=time()-1801;recordPortalMetric(['type'=>'visit']);check(publicMetrics()['visits']===2,'Inatividade de 30 minutos inicia nova visita');recordPortalMetric(['type'=>'search']);recordPortalMetric(['type'=>'search']);check((int)adminMetrics()['totals']['searches']===1,'Buscas rápidas são limitadas');check(adminMetrics()['today']['visits']===2,'Agregado diário acompanha visitas');$_SESSION=[];$_SERVER['HTTP_USER_AGENT']='Googlebot';recordPortalMetric(['type'=>'visit']);check(publicMetrics()['visits']===2,'Robôs identificados não contam');$_SERVER['HTTP_USER_AGENT']='Browser de teste';putenv('ANALYTICS_ENABLED=false');recordPortalMetric(['type'=>'visit']);check(publicMetrics()['visits']===2,'Coleta pausada não incrementa');
 putenv('NOTIFICATION_MODE=manual');queueNotice($b,'manual-only','Mensagem apenas manual');$before=$calls;$result=runDeliveries();check($calls===$before&&$result['queued']===0,'Modo manual bloqueia provedores mesmo configurados');check(env('NOTIFICATIONS_ENABLED')==='false','Modo manual força automação desligada');
+putenv('PIX_KEY=123e4567-e12b-12d1-a456-426655440000');putenv('PIX_RECIPIENT=RECEBEDOR TESTE');putenv('PIX_CITY=SARZEDO');
+query("INSERT INTO subscriptions(business_id,plan_id,provider_id,billing_type,status,created_at,amount_cents) VALUES(?,2,'manual_sub_legacy','PIX','active',?,7500)",[$bid,$now]);
+putenv('PAYMENT_DRIVER=asaas');
+check(!asaasConfigured(),'Asaas sem chave e webhook não emite cobranças novas');
+prepareManualRenewals();
+$legacy=one("SELECT p.id FROM payments p JOIN subscriptions s ON s.id=p.subscription_id WHERE s.provider_id='manual_sub_legacy'");
+check((bool)$legacy,'Assinatura manual anterior continua gerando Pix após selecionar Asaas');
+$legacyInvoice=checkout(one('SELECT * FROM businesses WHERE id=?',[$bid]),['plan_id'=>2]);
+check(!empty($legacyInvoice['manual'])&&$legacyInvoice['payment']['id']===$legacy['id'],'Assinante manual continua no fluxo de conferência manual');
 echo "$assertions verificações de pagamentos e automação passaram com provedores simulados.\n";

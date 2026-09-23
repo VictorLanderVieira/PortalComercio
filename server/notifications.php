@@ -9,7 +9,7 @@ function runDeliveries(bool $dryRun=false): array {
  query("UPDATE deliveries SET status='uncertain',last_error='Processo interrompido durante envio; verificar no provedor.' WHERE status='sending' AND updated_at<?",[date('Y-m-d H:i:s',strtotime('-10 minutes'))]);
  $rows=query("SELECT d.*,n.message,n.business_id,n.dedup_key,b.name,b.phone,b.whatsapp_consent,b.notification_channel,b.status business_status,b.paid_until,b.trial_until,b.manual_until,u.email FROM deliveries d JOIN notifications n ON n.id=d.notification_id JOIN businesses b ON b.id=n.business_id JOIN users u ON u.id=b.user_id WHERE d.status IN ('pending','retry') AND (d.next_attempt_at IS NULL OR d.next_attempt_at<=?) AND n.status='pending' AND b.is_demo=0 ORDER BY d.id LIMIT 100",[date('Y-m-d H:i:s')])->fetchAll();
  foreach($rows as$d){
-  if(str_starts_with($d['dedup_key'],'paid_')){$payment=one('SELECT status FROM payments WHERE provider_id=?',[substr($d['dedup_key'],5)]);if(!$payment||!in_array($payment['status'],['RECEIVED','CONFIRMED'])){query("UPDATE deliveries SET status='cancelled',updated_at=? WHERE id=?",[date('Y-m-d H:i:s'),$d['id']]);continue;}}
+  if(str_starts_with($d['dedup_key'],'paid_')){$payment=one('SELECT status FROM payments WHERE provider_id=?',[substr($d['dedup_key'],5)]);if(!$payment||$payment['status']!=='RECEIVED'){query("UPDATE deliveries SET status='cancelled',updated_at=? WHERE id=?",[date('Y-m-d H:i:s'),$d['id']]);continue;}}
 
   if($d['business_status']==='suspended'||(str_starts_with($d['dedup_key'],'expiry_')&&$d['dedup_key']!==('expiry_'.$d['business_id'].'_'.validUntil($d).'_'.(validUntil($d)<=date('Y-m-d H:i:s')?'expired':'soon')))||(str_starts_with($d['dedup_key'],'expiry_')&&!str_contains($d['dedup_key'],validUntil($d)))||(str_starts_with($d['dedup_key'],'activation_')&&validUntil($d)>date('Y-m-d H:i:s'))){query("UPDATE deliveries SET status='cancelled',updated_at=? WHERE id=?",[date('Y-m-d H:i:s'),$d['id']]);continue;}
   if(($d['channel']==='whatsapp'&&!$d['whatsapp_consent'])||!in_array($d['notification_channel'],[$d['channel'],'both'])){query("UPDATE deliveries SET status='cancelled',updated_at=? WHERE id=?",[date('Y-m-d H:i:s'),$d['id']]);continue;}
@@ -26,7 +26,7 @@ function runDeliveries(bool $dryRun=false): array {
 }
 function reconcilePayments(): void {
  if(env('PAYMENT_DRIVER','demo')!=='asaas')return;
- foreach(query("SELECT * FROM subscriptions WHERE provider_id IS NOT NULL AND provider_id NOT LIKE 'demo_%'")->fetchAll()as$s){
+ foreach(query("SELECT * FROM subscriptions WHERE provider_id IS NOT NULL AND provider_id NOT LIKE 'demo_%' AND provider_id NOT LIKE 'manual_%' AND status<>'cancelled'")->fetchAll()as$s){
   $offset=0;do{$page=asaas('GET','/subscriptions/'.rawurlencode($s['provider_id']).'/payments?limit=100&offset='.$offset);foreach($page['data']??[]as$p)applyPayment($p);$offset+=100;}while(!empty($page['hasMore']));
  }
 }

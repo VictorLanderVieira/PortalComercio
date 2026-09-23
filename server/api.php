@@ -3,6 +3,7 @@ require __DIR__.'/bootstrap.php';
 $requestLock=fopen(ROOT.'/storage/requests.lock','c');if(!$requestLock||!flock($requestLock,LOCK_SH)){http_response_code(503);exit;}
 if(is_file(ROOT.'/storage/maintenance.flag')){header('Retry-After: 60');jsonResponse(['error'=>'Portal em atualização. Tente novamente em instantes.'],503);}
 require __DIR__.'/payments.php';
+require __DIR__.'/ad-orders.php';
 require __DIR__.'/features.php';
 require __DIR__.'/advertisements.php';
 require __DIR__.'/finance.php';
@@ -22,12 +23,14 @@ try {
  if($path==='/api/metrics'&&$method==='POST'){recordPortalMetric(input());jsonResponse(publicMetrics());}
  if(preg_match('#^/api/businesses/(\d+)/events$#',$path,$metricMatch) && $method==='POST'){recordBusinessMetric((int)$metricMatch[1],input());jsonResponse(['ok'=>true]);}
  googleRoutes($path,$method);
+ adOrderRoutes($path,$method);
  advertisementRoutes($path,$method);
  featureRoutes($path,$method);
  if ($path==='/api/session') {
-  jsonResponse(['user'=>empty($_SESSION['user_id'])?null:one('SELECT id,name,email,role FROM users WHERE id=?',[$_SESSION['user_id']]),'csrf'=>$_SESSION['csrf'],'demo'=>env('PAYMENT_DRIVER','demo')==='demo','local'=>env('APP_ENV','local')==='local','settings'=>settings(),'manual_pix'=>env('PAYMENT_DRIVER')==='manual_pix','google_enabled'=>googleLoginEnabled()]);
+  jsonResponse(['user'=>empty($_SESSION['user_id'])?null:one('SELECT id,name,email,role FROM users WHERE id=?',[$_SESSION['user_id']]),'csrf'=>$_SESSION['csrf'],'demo'=>env('PAYMENT_DRIVER','demo')==='demo','local'=>env('APP_ENV','local')==='local','settings'=>settings(),'manual_pix'=>env('PAYMENT_DRIVER')==='manual_pix','asaas_pix'=>asaasConfigured(),'google_enabled'=>googleLoginEnabled()]);
  }
  if ($path==='/api/catalog' && $method==='GET') jsonResponse(['categories'=>query('SELECT * FROM categories')->fetchAll(),'plans'=>planCatalog(),'free_covers'=>freeCoverLibrary()]);
+ if ($path==='/api/me/payment-status'&&$method==='GET'){$u=user();$id=(string)($_GET['id']??'');if(!preg_match('/^[A-Za-z0-9_-]{3,100}$/',$id))fail('Cobrança inválida.');$p=one('SELECT p.status,p.valid_until FROM payments p JOIN subscriptions s ON s.id=p.subscription_id JOIN businesses b ON b.id=s.business_id WHERE p.provider_id=? AND b.user_id=?',[$id,$u['id']]);if(!$p)fail('Cobrança não encontrada.',404);if(!in_array($p['status'],['RECEIVED','REFUNDED','CHARGEBACK_REQUESTED','CHARGEBACK_DISPUTE'],true)&&env('PAYMENT_DRIVER')==='asaas'&&asaasConfigured()){try{applyPayment(asaas('GET','/payments/'.rawurlencode($id)));$p=one('SELECT p.status,p.valid_until FROM payments p JOIN subscriptions s ON s.id=p.subscription_id JOIN businesses b ON b.id=s.business_id WHERE p.provider_id=? AND b.user_id=?',[$id,$u['id']]);}catch(Throwable $e){error_log('Consulta Pix '.$id.': '.$e->getMessage());}}jsonResponse($p);}
  if (in_array($path,['/api/login','/api/register']) && $method==='POST') {
   $d=input(); $email=strtolower(field($d,'email',3,190)); $password=field($d,'password',8,200);
   if(!filter_var($email,FILTER_VALIDATE_EMAIL)) fail('Informe um e-mail válido.');
@@ -134,6 +137,7 @@ try {
   applyPayment(['id'=>$p['provider_id'],'status'=>'RECEIVED','value'=>$p['amount_cents']/100,'dueDate'=>$p['due_date'],'paymentDate'=>date('Y-m-d')]);jsonResponse(['ok'=>true]);
  }
  fail('Rota não encontrada.',404);
-} catch(Throwable $e) { if(db()->inTransaction())db()->rollBack(); error_log($e->getMessage()); jsonResponse(['error'=>'Não foi possível concluir a operação. Tente novamente ou contate o suporte.'],500); }
+} catch(AsaasUnavailableException $e) { if(db()->inTransaction())db()->rollBack(); error_log($e->getMessage()); jsonResponse(['error'=>'Não foi possível conectar ao Asaas para gerar ou consultar o Pix. Tente novamente em alguns minutos.'],503); }
+catch(Throwable $e) { if(db()->inTransaction())db()->rollBack(); error_log($e->getMessage()); jsonResponse(['error'=>'Não foi possível concluir a operação. Tente novamente ou contate o suporte.'],500); }
 
 

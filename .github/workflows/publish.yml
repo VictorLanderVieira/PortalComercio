@@ -65,7 +65,7 @@ jobs:
           php scripts/backup-db.php dist/ci-database.sql.gz
           mysql -h 127.0.0.1 -u root -e "CREATE DATABASE portal_restore CHARACTER SET utf8mb4"
           gzip -dc dist/ci-database.sql.gz | mysql -h 127.0.0.1 -u root portal_restore
-          test "$(mysql -N -h 127.0.0.1 -u root portal_restore -e 'SELECT MAX(version) FROM schema_migrations')" = "20"
+          test "$(mysql -N -h 127.0.0.1 -u root portal_restore -e 'SELECT MAX(version) FROM schema_migrations')" = "21"
       - run: npm run release
       - name: Configurar conexão SSH
         env:

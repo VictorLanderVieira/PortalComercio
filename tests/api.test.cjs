@@ -137,7 +137,45 @@ test('Portal: regras de negócio, segurança e fluxo completo',async t=>{
   assert.equal(sql("echo query('SELECT COUNT(*) FROM reviews WHERE id="+review.id+" AND hidden_at IS NOT NULL AND hidden_by_user_id="+mine.user_id+"')->fetchColumn();"),'1');
   await b.req('POST','/businesses/'+mine.id+'/reviews',{rating:1,comment:'Tentativa de repetir a mesma avaliação.'},409);
  });
-});
+ await t.test('Asaas: somente admin configura segredos privados e ativação explícita',async()=>{
+  const key='$aact_test_key_only_for_local_verification_2026';
+  const token='webhook_secure_local_token_2026_very_long';
+  await a.req('POST','/admin/asaas',{api_key:key,webhook_token:token,enabled:false,admin_password:'AdminTeste#2026!'},403);
+  await admin.req('POST','/admin/asaas',{api_key:key,webhook_token:token,enabled:false,admin_password:'errada'},403);
+  const before=await admin.req('GET','/admin/overview');
+  const saved=await admin.req('POST','/admin/asaas',{api_key:key,webhook_token:token,enabled:false,admin_password:'AdminTeste#2026!'});
+  assert.equal(saved.enabled,false);assert.equal(saved.api_key_configured,true);assert.equal(saved.webhook_token_configured,true);
+  assert.equal(JSON.stringify(saved).includes(key),false);assert.equal(JSON.stringify(saved).includes(token),false);
+  const after=await admin.req('GET','/admin/overview');
+  assert.equal(after.asaas_settings.enabled,false);assert.equal(JSON.stringify(after).includes(key),false);assert.equal(JSON.stringify(after).includes(token),false);
+  assert.equal(php("echo env('ASAAS_API_KEY');"),key);
+  assert.equal(php("echo env('ASAAS_WEBHOOK_TOKEN');"),token);
+  await admin.req('POST','/admin/asaas',{enabled:true,admin_password:'AdminTeste#2026!'},422);
+  const active=await admin.req('POST','/admin/asaas',{enabled:true,webhook_ready:true,admin_password:'AdminTeste#2026!'});
+  assert.equal(active.enabled,true);assert.equal((await admin.session()).asaas_pix,true);
+  assert.equal((await admin.req('POST','/admin/asaas',{enabled:false,admin_password:'AdminTeste#2026!'})).enabled,false);
+  assert.equal(before.asaas_settings.api_key_configured,false);
+ }); await t.test('Publicidade automática: login, Pix confirmado e publicação pelo proprietário',async()=>{
+  php("$f=integrationConfigPath();$c=integrationConfig();$c['PAYMENT_DRIVER']='demo';file_put_contents($f,json_encode($c));");
+  const owner=new Client();await owner.register('Anunciante','anunciante-pix@test.local');
+  await owner.req('POST','/me/business',{...form,name:'Oferta do anunciante',plan_id:4,interest_plan_id:4});
+  const b=await owner.req('GET','/me/business');await admin.req('POST','/admin/businesses/'+b.id+'/approve',{reason:'Cadastro conferido para publicidade'});
+  await (new Client()).req('GET','/me/ad-order',null,401);
+  const first=await owner.req('POST','/me/ad-order',{expected_amount_cents:1});
+  assert.equal(first.provider,'demo');assert.equal(first.amount_cents,3500);assert.equal(first.status,'pending');assert.equal(first.whatsapp_url,undefined);
+  assert.equal((await owner.req('POST','/me/ad-order',{})).id,first.id);
+  await owner.req('POST','/me/advertisements',{order_id:first.id,creative_mode:'manual',title:'Oferta do bairro',description:'Nossa oferta para os moradores de Sarzedo.',image_url:'/assets/pharmacy.svg',offer_price:19.90},409);
+  await owner.req('POST','/me/ad-order/demo-pay',{});
+  const paid=await owner.req('GET','/me/ad-order');assert.equal(paid.status,'paid');
+  const ad=await owner.req('POST','/me/advertisements',{order_id:first.id,creative_mode:'manual',title:'Oferta do bairro',description:'Nossa oferta para os moradores de Sarzedo.',image_url:'/assets/pharmacy.svg',offer_price:19.90},201);
+  assert.equal(ad.monthly_amount_cents,3500);assert.equal(Number(ad.order_id),first.id);assert.equal(ad.status,'active');
+  assert.ok((await owner.req('GET','/advertisements')).some(x=>x.id===ad.id));
+  await owner.req('POST','/me/advertisements',{order_id:first.id,creative_mode:'manual',title:'Reuso indevido',description:'Mesmo pedido pela segunda vez.',image_url:'/assets/pharmacy.svg'},409);
+  const next=await owner.req('POST','/me/ad-order',{});assert.notEqual(next.id,first.id);assert.equal(next.status,'pending');
+  sql("query('UPDATE ad_orders SET expires_at=? WHERE id=?',['2020-01-01 00:00:00',"+next.id+"]);");
+  assert.equal((await owner.req('GET','/me/ad-order/status')).status,'expired');
+  assert.notEqual((await owner.req('POST','/me/ad-order',{})).id,next.id);
+ });});
 process.on('exit',()=>{if(server)server.kill();});test.after(()=>{if(server)server.kill();});
 
 

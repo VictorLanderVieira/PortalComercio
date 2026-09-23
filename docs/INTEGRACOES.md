@@ -2,13 +2,15 @@
 
 ## Pix mensal — Asaas
 
-A conta de recebimento deve ser do responsável pelo portal. Configure `ASAAS_API_KEY` e escolha `ASAAS_ENV=sandbox` durante os testes. Quando estiver homologado, use a conta/chave de produção.
+A conta de recebimento deve ser do responsável pelo portal. Configure `ASAAS_API_KEY` e escolha `ASAAS_ENV=sandbox` durante os testes. Quando estiver homologado, use a conta/chave de produção. O Pix pessoal configurado no administrativo continua com confirmação manual enquanto o Asaas não for habilitado no painel (ou `PAYMENT_DRIVER=asaas` no `.env` privado). Cadastrar apenas a chave não ativa cobranças. Em homologação (`DEPLOY_ENV=staging`), cobrança real permanece desabilitada.
 
-Fluxo: proprietário salva cadastro → escolhe plano → informa CPF/CNPJ válido → backend cria cliente no Asaas → cria assinatura mensal com `billingType=PIX` → recupera a primeira cobrança pendente e QR Code → visitante paga → webhook confirma → portal libera o período.
+Fluxo: proprietário salva cadastro → escolhe plano → informa CPF/CNPJ válido → backend cria cliente no Asaas → cria assinatura mensal com `billingType=PIX` → recupera a primeira cobrança pendente e QR Code → visitante paga → webhook confirma → portal libera o período. **A primeira publicação ainda exige aprovação administrativa do cadastro**. Um pagamento antecipado registra o período pago, mas não publica o negócio até a aprovação. Depois de aprovado, cada mensalidade paga renova o prazo sem uma nova revisão do cadastro.
 
 O valor vem do banco, nunca do navegador. O CPF/CNPJ é validado por dígitos verificadores e enviado ao provedor; não é persistido no cadastro local. O ID de cliente e assinatura são guardados para futuras cobranças.
 
 O Pix mensal precisa ser pago pelo cliente. Não é Pix Automático com débito autorizado. O Asaas gera as cobranças futuras da assinatura; o worker envia os avisos. Cancelar renovação no painel cancela a assinatura no provedor e impede novas cobranças, preservando o acesso já pago.
+
+Na produção, o administrador pode cadastrar a chave de API e o token do webhook em **Administração → Configuração do Asaas**. Os campos ficam vazios ao reabrir o painel; o status mostra apenas se cada segredo está cadastrado. Salvar os segredos não ativa cobranças. Depois de conferir a URL, o token e a ativação do webhook no Asaas, marque a opção de usar Asaas e confirme a senha de administrador. O painel guarda os segredos no armazenamento privado do servidor, fora do Git, com permissão restrita. Como alternativa operacional, as variáveis `PAYMENT_DRIVER=asaas`, `ASAAS_ENV=production`, `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` podem ser definidas no `.env` privado; uma configuração gravada no painel prevalece sobre elas. Teste uma cobrança controlada antes de divulgar o fluxo. Sem Asaas habilitado, use o Pix manual; os cadastros e pagamentos anteriores não são apagados. Assinaturas manuais já ativas continuam gerando Pix manual e exigem conferência no administrativo após a troca; só novas assinaturas usam Asaas. O agendador não consulta assinaturas manuais na API Asaas.
 
 ### Webhook
 
@@ -21,6 +23,16 @@ O Pix mensal precisa ser pago pelo cliente. Não é Pix Automático com débito 
 - Retorno 2xx somente após processamento persistido; falhas devem ser reenviadas pelo provedor.
 
 A data final do período pago é calculada a partir da data mais recente entre vencimento e pagamento, mais um mês civil, ajustando fins de mês. Confirmar a mesma cobrança novamente não acrescenta dias. Notificações fora de ordem buscam a situação atual do provedor.
+
+Para contas de pessoa física, `CONFIRMED` pode ser temporário durante bloqueio cautelar. O portal registra esse estado, mas só libera ou renova o plano quando o pagamento chegar a `RECEIVED`; estorno retira o período correspondente. O cadastro continua sujeito à aprovação administrativa inicial.
+
+Nas telas de pagamento, o portal consulta o status a cada cinco segundos e também recebe o webhook. Ao atingir `RECEIVED`, o plano é atualizado sem conferência manual. Se o visitante fechar a tela, o webhook continua processando o pagamento. A cobrança mensal é gerada pela assinatura Asaas; cada Pix pago renova o prazo.
+
+### Publicidade avulsa com Asaas
+
+Com o Asaas habilitado, o botão **Divulgue aqui** exige login e um negócio já aprovado. O cliente gera um Pix separado do plano, com valor definido no servidor, e vê o QR Code, o código Copia e Cola e um contador de 30 minutos. O portal consulta o Asaas e cancela a cobrança não paga após esse prazo; o worker também faz essa limpeza. O status `CONFIRMED` fica em análise, e só `RECEIVED` libera a criação da publicidade. O pedido pago aparece em **Minha conta → Publicidade avulsa**, onde o cliente envia um banner pronto ou monta o anúncio com imagem e dados. Ao salvar, ele entra no rodízio pelo período contratado sem cadastro ou ativação pelo administrador. Um pedido pago só pode ser usado uma vez. O administrador ainda pode pausar um conteúdo indevido.
+
+Sem Asaas habilitado, o botão mantém o contato pelo WhatsApp e o administrador cadastra e confirma a publicidade manualmente, como antes. Pedidos antigos e dados existentes permanecem preservados. O pagamento Asaas foi verificado apenas com provedores simulados; faça um Pix real controlado antes de divulgar esse fluxo.
 
 Uma solicitação de criação com resposta incerta fica em `creating`. Antes de reenviar, consulte a conta Asaas pela referência `subscription_ID`. A implementação evita retentativa automática de criação para não cobrar duas vezes. Não há falsa confirmação de pagamento pelo retorno do navegador.
 
