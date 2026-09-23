@@ -32,3 +32,5 @@ if(!one('SELECT version FROM schema_migrations WHERE version=13')){db()->exec(fi
 if(!one('SELECT version FROM schema_migrations WHERE version=14')){db()->exec(file_get_contents(ROOT.'/database/014-business-minisite.sql'));query('INSERT INTO schema_migrations VALUES(14,?)',[date('Y-m-d H:i:s')]);echo "Conteúdo do minisite empresarial adicionado.\n";}
 
 if(!one('SELECT version FROM schema_migrations WHERE version=15')){db()->exec(file_get_contents(ROOT.'/database/015-advertisement-creative-mode.sql'));query('INSERT INTO schema_migrations VALUES(15,?)',[date('Y-m-d H:i:s')]);echo "Modos de criação de publicidade adicionados.\n";}
+
+if(!one('SELECT version FROM schema_migrations WHERE version=16')){db()->exec(file_get_contents(ROOT.'/database/016-maps-embed-key.sql'));query('INSERT INTO schema_migrations VALUES(16,?)',[date('Y-m-d H:i:s')]);echo "Configuração do mapa incorporado adicionada.\n";}
