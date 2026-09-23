@@ -7,6 +7,15 @@ function tree(dir){for(const e of fs.readdirSync(path.join(root,dir),{withFileTy
 for(const dir of ['public','server','database'])tree(dir);
 for(const file of ['migrate.php','upgrade.php','create-admin.php','worker.php','preflight.php','backup-db.php','verify-safe-migrations.php'])copy('scripts/'+file);
 copy('public/uploads/.htaccess');copy('.env.production.example');copy('.env.staging.example');
+const htmlPath=path.join(staging,'public','index.html');
+let html=fs.readFileSync(htmlPath,'utf8');
+for(const asset of ['app.js','styles.css']){
+ const hash=crypto.createHash('sha256').update(fs.readFileSync(path.join(staging,'public',asset))).digest('hex').slice(0,12);
+ const old=new RegExp('/'+asset.replace('.','\\.')+'\\?v=[^"\\s]+','g');
+ if(!old.test(html))throw Error('Referência versionada ausente: '+asset);
+ html=html.replace(old,'/'+asset+'?v='+hash);
+}
+fs.writeFileSync(htmlPath,html);
 fs.mkdirSync(path.join(staging,'storage'),{recursive:true});
 fs.mkdirSync(path.join(root,'dist'),{recursive:true});
 const output=path.join(root,'dist','portal-release.tar.gz');
