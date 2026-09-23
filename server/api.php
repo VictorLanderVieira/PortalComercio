@@ -51,7 +51,7 @@ try {
   $order=($_GET['sort']??'')==='rating'?'rating DESC,b.name ASC,b.id ASC':"CASE WHEN (b.paid_until>'".date('Y-m-d H:i:s')."' OR b.trial_until>'".date('Y-m-d H:i:s')."' OR b.manual_until>'".date('Y-m-d H:i:s')."') THEN p.priority ELSE 0 END DESC,rating DESC,b.name ASC,b.id ASC";
   $ratingEligibility="b.plan_id<>4 AND b.reviews_opt_in=1 AND (b.paid_until>'".date('Y-m-d H:i:s')."' OR b.trial_until>'".date('Y-m-d H:i:s')."' OR b.manual_until>'".date('Y-m-d H:i:s')."')";
   $pageSize=40;$total=(int)one("SELECT COUNT(*) n FROM businesses b JOIN plans p ON p.id=b.plan_id JOIN categories c ON c.id=b.category_id WHERE $where",$params)['n'];$pages=max(1,(int)ceil($total/$pageSize));$page=max(1,min($pages,(int)($_GET['page']??1)));$offset=array_key_exists('offset',$_GET)?max(0,min(100000,(int)$_GET['offset'])):($page-1)*$pageSize;
-  $items=query("SELECT b.*,c.name category,p.name plan,p.priority,COALESCE((SELECT AVG(r.rating) FROM reviews r WHERE r.business_id=b.id AND $ratingEligibility),0) rating,(SELECT COUNT(*) FROM reviews r WHERE r.business_id=b.id AND $ratingEligibility) review_count FROM businesses b JOIN plans p ON p.id=b.plan_id JOIN categories c ON c.id=b.category_id WHERE $where ORDER BY $order LIMIT $pageSize OFFSET $offset",$params)->fetchAll();
+  $items=query("SELECT b.*,c.name category,p.name plan,p.priority,COALESCE((SELECT AVG(r.rating) FROM reviews r WHERE r.business_id=b.id AND r.hidden_at IS NULL AND $ratingEligibility),0) rating,(SELECT COUNT(*) FROM reviews r WHERE r.business_id=b.id AND r.hidden_at IS NULL AND $ratingEligibility) review_count FROM businesses b JOIN plans p ON p.id=b.plan_id JOIN categories c ON c.id=b.category_id WHERE $where ORDER BY $order LIMIT $pageSize OFFSET $offset",$params)->fetchAll();
   header('X-Total-Count: '.$total);header('X-Total-Pages: '.$pages);header('X-Current-Page: '.$page);header('X-Page-Size: '.$pageSize);
   jsonResponse(array_map('publicBusiness',$items));
  }
@@ -60,7 +60,7 @@ try {
   if(!$b || !isListed($b)) fail('Este comércio não está disponível no momento.',404);
   $b=publicBusiness($b);
   $b['photos']=$b['is_free']?[]:query('SELECT id,url FROM photos WHERE business_id=?',[$m[1]])->fetchAll();
-  $b['reviews']=!$b['reviews_enabled']?[]:query('SELECT r.id,r.rating,r.comment,r.created_at,u.name FROM reviews r JOIN users u ON u.id=r.user_id WHERE business_id=? ORDER BY r.id DESC',[$m[1]])->fetchAll();
+  $b['reviews']=!$b['reviews_enabled']?[]:query('SELECT r.id,r.rating,r.comment,r.created_at,u.name FROM reviews r JOIN users u ON u.id=r.user_id WHERE r.business_id=? AND r.hidden_at IS NULL ORDER BY r.id DESC',[$m[1]])->fetchAll();
   $b['promotions']=businessPromotions((int)$m[1]);
   $b['posts']=$b['is_free']?[]:query('SELECT id,title,body,created_at FROM posts WHERE business_id=? ORDER BY id DESC LIMIT 20',[$m[1]])->fetchAll(); jsonResponse($b);
  }
@@ -74,8 +74,18 @@ try {
  }
  if($path==='/api/me/business' && $method==='GET') {
   $u=user(); $b=one('SELECT * FROM businesses WHERE user_id=?',[$u['id']]);
-  if($b){$b['business_code']=businessCode((int)$b['id']);$b['free_cover_url']=freeCoverUrl($b);$b['is_free']=isFreeBusiness($b);$b['display_free']=isFreeBusiness($b)||hasFreeDisplay($b);$b['display_until']=$b['display_free']?freeDisplayUntil($b):validUntil($b);$b['listed']=isListed($b);$b['suspended_by_expiry']=suspendedByExpiry($b);$b['visible']=isLive($b)&&isListed($b);$b['valid_until']=validUntil($b);$b['promotions']=query('SELECT * FROM promotions WHERE business_id=? ORDER BY id DESC',[$b['id']])->fetchAll();$b['photos']=query('SELECT * FROM photos WHERE business_id=?',[$b['id']])->fetchAll();$b['posts']=query('SELECT * FROM posts WHERE business_id=? ORDER BY id DESC',[$b['id']])->fetchAll();$b['subscriptions']=query('SELECT s.*,p.name plan FROM subscriptions s JOIN plans p ON p.id=s.plan_id WHERE business_id=? ORDER BY id DESC',[$b['id']])->fetchAll();$b['payments']=query('SELECT p.* FROM payments p JOIN subscriptions s ON s.id=p.subscription_id WHERE s.business_id=? ORDER BY p.id DESC LIMIT 24',[$b['id']])->fetchAll();}
+  if($b){$b['business_code']=businessCode((int)$b['id']);$b['free_cover_url']=freeCoverUrl($b);$b['is_free']=isFreeBusiness($b);$b['display_free']=isFreeBusiness($b)||hasFreeDisplay($b);$b['display_until']=$b['display_free']?freeDisplayUntil($b):validUntil($b);$b['listed']=isListed($b);$b['suspended_by_expiry']=suspendedByExpiry($b);$b['visible']=isLive($b)&&isListed($b);$b['valid_until']=validUntil($b);$b['reviews']=query('SELECT r.id,r.rating,r.comment,r.created_at,u.name FROM reviews r JOIN users u ON u.id=r.user_id WHERE r.business_id=? AND r.hidden_at IS NULL ORDER BY r.id DESC',[$b['id']])->fetchAll();$b['promotions']=query('SELECT * FROM promotions WHERE business_id=? ORDER BY id DESC',[$b['id']])->fetchAll();$b['photos']=query('SELECT * FROM photos WHERE business_id=?',[$b['id']])->fetchAll();$b['posts']=query('SELECT * FROM posts WHERE business_id=? ORDER BY id DESC',[$b['id']])->fetchAll();$b['subscriptions']=query('SELECT s.*,p.name plan FROM subscriptions s JOIN plans p ON p.id=s.plan_id WHERE business_id=? ORDER BY id DESC',[$b['id']])->fetchAll();$b['payments']=query('SELECT p.* FROM payments p JOIN subscriptions s ON s.id=p.subscription_id WHERE s.business_id=? ORDER BY p.id DESC LIMIT 24',[$b['id']])->fetchAll();}
   jsonResponse($b);
+ }
+ if(preg_match('#^/api/me/reviews/(\d+)$#',$path,$m) && $method==='DELETE') {
+  $b=business();
+  transaction(function()use($b,$m){
+   lockBusiness((int)$b['id']);
+   $review=one('SELECT id FROM reviews WHERE id=? AND business_id=? AND hidden_at IS NULL',[(int)$m[1],$b['id']]);
+   if(!$review)fail('Avaliação não encontrada neste cadastro.',404);
+   query('UPDATE reviews SET hidden_at=?,hidden_by_user_id=? WHERE id=?',[date('Y-m-d H:i:s'),$b['user_id'],$review['id']]);
+  });
+  jsonResponse(['ok'=>true]);
  }
  if($path==='/api/me/photos' && $method==='POST') {
   $b=business(); $kind=$_POST['kind']??'gallery'; if(!in_array($kind,['gallery','logo','cover'])) fail('Tipo de imagem inválido.');

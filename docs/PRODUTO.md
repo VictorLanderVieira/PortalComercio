@@ -73,6 +73,8 @@ O cliente se cadastra, gera a cobrança Pix no painel e paga. O botão da cobran
 
 Avaliações: planos pagos permitem ao proprietário habilitar/desabilitar em Minha vitrine → Disponibilizar avaliações dos clientes. Padrão habilitado para cadastros novos e existentes. Desabilitar oculta notas, contagens e comentários, impede novas avaliações e remove a nota do desempate na busca, sem excluir registros. A preferência permanece após vencimento e renovação; nunca libera avaliações no Free.
 
+Na aba **Avaliações** de Minha Conta, o proprietário pode retirar uma avaliação individual da exibição pública após confirmar a ação. A nota média e a contagem passam a considerar apenas avaliações visíveis. O registro é preservado com data e usuário responsável pela remoção para auditoria; o cliente que publicou a avaliação não pode criar outra para o mesmo negócio usando a mesma conta.
+
 O plano de interesse é coletado somente no cadastro inicial e preservado como histórico de captação. Minha conta exibe o plano atual (plan_id), sem seletor de interesse na edição. A API ignora tentativas de alterar ambos por edição de perfil. A troca continua por pagamento confirmado ou ativação administrativa. Imagens de cartão e capa são ajustadas proporcionalmente para exibição completa, sem recorte, com fundo neutro nas sobras.
 
 No Free, a imagem de cartão e topo pode ser escolhida na biblioteca fixa em Fotos e identidade, sem upload. A escolha é única para ambos, preservada separadamente da capa paga. Sem escolha, usa-se imagem por categoria. Biblioteca: comércio local, farmácia/saúde, alimentação, mercado, beleza, oficina/serviços, flores e academia. Categoria adicionada: Academia / Personal Trainer.

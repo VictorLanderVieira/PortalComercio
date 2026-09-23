@@ -116,6 +116,25 @@ test('Portal: regras de negócio, segurança e fluxo completo',async t=>{
   await paid.req('POST','/me/free-cover',{key:'pharmacy'});let publicBusiness=await paid.req('GET','/businesses/'+mine.id);assert.equal(publicBusiness.is_free,false);assert.equal(publicBusiness.cover_url,'/assets/pharmacy.svg');
   await paid.req('POST','/me/free-cover',{key:'auto'});publicBusiness=await paid.req('GET','/businesses/'+mine.id);assert.equal(publicBusiness.cover_url,'/assets/neighborhood.svg');
  });
+ await t.test('Proprietário remove avaliação da exibição, com auditoria e sem acessar outro negócio',async()=>{
+  const owner=new Client();await owner.register('Dono avaliado','dono-avaliado@test.local');
+  await owner.req('POST','/me/business',{...form,name:'Negócio avaliado',plan_id:1,interest_plan_id:1});
+  const mine=await owner.req('GET','/me/business');
+  await admin.req('POST','/admin/businesses/'+mine.id+'/approve',{reason:'Cadastro conferido'});
+  await admin.req('POST','/admin/businesses/'+mine.id+'/activate',{plan_id:1,days:30,reason:'Plano ativo'});
+  await b.req('POST','/businesses/'+mine.id+'/reviews',{rating:1,comment:'Atendimento ruim nesta visita.'},201);
+  const review=(await owner.req('GET','/me/business')).reviews[0];
+  assert.equal(review.rating,1);
+  assert.equal((await owner.req('GET','/businesses')).find(row=>row.id===mine.id).review_count,1);
+  await a.req('DELETE','/me/reviews/'+review.id,null,404);
+  await owner.req('DELETE','/me/reviews/'+review.id);
+  assert.deepEqual((await owner.req('GET','/me/business')).reviews,[]);
+  assert.deepEqual((await owner.req('GET','/businesses/'+mine.id)).reviews,[]);
+  const card=(await owner.req('GET','/businesses')).find(row=>row.id===mine.id);
+  assert.equal(card.rating,0);assert.equal(card.review_count,0);
+  assert.equal(sql("echo query('SELECT COUNT(*) FROM reviews WHERE id="+review.id+" AND hidden_at IS NOT NULL AND hidden_by_user_id="+mine.user_id+"')->fetchColumn();"),'1');
+  await b.req('POST','/businesses/'+mine.id+'/reviews',{rating:1,comment:'Tentativa de repetir a mesma avaliação.'},409);
+ });
 });
 process.on('exit',()=>{if(server)server.kill();});test.after(()=>{if(server)server.kill();});
 
