@@ -2,6 +2,8 @@ Options -Indexes
 DirectoryIndex index.html
 RewriteEngine On
 RewriteRule ^api/ api/index.php [L,QSA]
+RewriteRule ^empresa/[0-9]+/?$ seo.php [L,QSA]
+RewriteRule ^sitemap\.xml$ seo.php [L,QSA]
 <FilesMatch "^\.">
  Require all denied
 </FilesMatch>

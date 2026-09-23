@@ -1,0 +1,4 @@
+ALTER TABLE businesses ADD COLUMN hours_schedule VARCHAR(700) NOT NULL DEFAULT '';
+ALTER TABLE businesses ADD COLUMN delivery_available INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE businesses ADD COLUMN home_service_available INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE businesses ADD COLUMN updated_at DATETIME NULL;

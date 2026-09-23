@@ -16,7 +16,8 @@ function googleRoutes(string $path,string $method): void {
  $redirect=googleRedirectUri();
  if($path==='/api/auth/google/start'&&$method==='POST'){
   $d=input();if(empty($d['consent']))fail('Confirme a leitura da política de privacidade.');
-  $state=bin2hex(random_bytes(32));$verifier=bin2hex(random_bytes(32));$_SESSION['google_oauth']=['state'=>$state,'verifier'=>$verifier,'created'=>time(),'client_id'=>env('GOOGLE_CLIENT_ID'),'redirect_uri'=>$redirect,'link_user'=>$_SESSION['user_id']??null];
+  $returnTo=(string)($d['return_to']??'');if($returnTo!==''&&!preg_match('#^/#!/empresa/[1-9][0-9]*$#',$returnTo))fail('Destino de retorno inválido.');
+  $state=bin2hex(random_bytes(32));$verifier=bin2hex(random_bytes(32));$_SESSION['google_oauth']=['state'=>$state,'verifier'=>$verifier,'created'=>time(),'client_id'=>env('GOOGLE_CLIENT_ID'),'redirect_uri'=>$redirect,'link_user'=>$_SESSION['user_id']??null,'return_to'=>$returnTo?:'/#!/painel'];
   $params=['client_id'=>env('GOOGLE_CLIENT_ID'),'redirect_uri'=>$redirect,'response_type'=>'code','scope'=>'openid email profile','state'=>$state,'code_challenge'=>rtrim(strtr(base64_encode(hash('sha256',$verifier,true)),'+/','-_'),'='),'code_challenge_method'=>'S256','prompt'=>'select_account'];
   jsonResponse(['url'=>'https://accounts.google.com/o/oauth2/v2/auth?'.http_build_query($params)]);
  }
@@ -33,7 +34,7 @@ function googleRoutes(string $path,string $method): void {
   $email=strtolower($profile['email']);if($flow['link_user']){$current=one('SELECT email FROM users WHERE id=?',[$flow['link_user']]);if(!$current||$current['email']!==$email)fail('Vincule uma conta Google com o mesmo e-mail do seu cadastro.',409);}$u=one('SELECT * FROM users WHERE google_sub=?',[$profile['sub']]);
   if(!$u){$u=one('SELECT * FROM users WHERE email=?',[$email]);if($u && (($flow['link_user']??null)!=$u['id']))fail('Este e-mail já possui cadastro. Entre com a senha e vincule o Google na seção Privacidade da conta.',409);if($u){query('UPDATE users SET google_sub=? WHERE id=?',[$profile['sub'],$u['id']]);}else{query('INSERT INTO users(name,email,password_hash,google_sub,created_at) VALUES(?,?,?,?,?)',[mb_substr($profile['name']??$email,0,100),$email,password_hash(bin2hex(random_bytes(40)),PASSWORD_DEFAULT),$profile['sub'],date('Y-m-d H:i:s')]);$u=one('SELECT * FROM users WHERE id=?',[db()->lastInsertId()]);}}
   if($flow['link_user'] && $flow['link_user']!=$u['id'])fail('A conta Google não corresponde à conta que você está vinculando.',409);
-  session_regenerate_id(true);$_SESSION['user_id']=$u['id'];$_SESSION['csrf']=bin2hex(random_bytes(32));header('Location: /#!/painel');exit;
+  session_regenerate_id(true);$_SESSION['user_id']=$u['id'];$_SESSION['csrf']=bin2hex(random_bytes(32));header('Location: '.$flow['return_to']);exit;
  }
  fail('Rota não encontrada.',404);
 }

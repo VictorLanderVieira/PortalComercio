@@ -11,7 +11,16 @@ test('Estrelas clicáveis na busca e na empresa publicam a nota escolhida',async
  await page.locator('.card-title').filter({hasText:'Studio Bela'}).click();const form=page.locator('.review-form');await form.getByRole('radio',{name:'5 estrelas',exact:true}).check();await expect(form.locator('.selected')).toHaveCount(5);await form.getByRole('radio',{name:'3 estrelas',exact:true}).check();await expect(form.locator('.selected')).toHaveCount(3);await form.getByLabel('Conte para a gente').fill('Uma experiência para verificar a avaliação pelas estrelas.');await form.getByRole('button',{name:'Publicar avaliação'}).click();await expect(page.getByText('Uma experiência para verificar a avaliação pelas estrelas.')).toBeVisible();
 });
 test('Localização pública na busca e perfil; promoções avançam a cada cinco segundos',async({page})=>{
- await page.route('**/api/businesses**',async route=>{const response=await route.fetch();const data=await response.json();if(Array.isArray(data)){data[0].maps_url='https://maps.app.goo.gl/localTeste';data.slice(1).forEach(b=>b.maps_url='');}else data.maps_url='https://maps.app.goo.gl/localTeste';await route.fulfill({response,json:data});});
+ await page.route('**/api/businesses**',async route=>{
+  try {
+   const response=await route.fetch();const data=await response.json();
+   if(Array.isArray(data)){data[0].maps_url='https://maps.app.goo.gl/localTeste';data.slice(1).forEach(b=>b.maps_url='');}else data.maps_url='https://maps.app.goo.gl/localTeste';
+   await route.fulfill({response,json:data});
+  } catch(error) {
+   // Angular can cancel an earlier search while the page changes routes.
+   if(!/disposed|Target page, context or browser has been closed/i.test(String(error))) throw error;
+  }
+ });
  await page.route('**/api/promotions',route=>route.fulfill({json:[1,2].map(id=>({id,business_id:1,title:'Oferta teste '+id,description:'Condições da oferta',price_cents:2500,image_url:'/assets/cafe.svg',business_name:'Café da Praça'}))}));
  await page.route('**/api/session',async route=>{const response=await route.fetch();const data=await response.json();data.settings.maps_embed_key='AIza12345678901234567890123456789012345';await route.fulfill({response,json:data});});
  await page.route('https://www.google.com/maps/embed/**',route=>route.fulfill({contentType:'text/html',body:'<p>Mapa de teste</p>'}));

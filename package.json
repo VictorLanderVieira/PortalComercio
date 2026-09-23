@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "setup": "node scripts/assets.cjs && php -d extension=pdo_sqlite scripts/migrate.php && php -d extension=pdo_sqlite scripts/seed.php && php -d extension=pdo_sqlite scripts/demo.php && php scripts/icons.php",
+    "prestart": "php -d extension=pdo_sqlite scripts/migrate.php",
     "start": "php -d extension=pdo_sqlite -S localhost:8080 -t public server/router.php",
     "test": "php -d extension=pdo_sqlite tests/payment-unit.php && node --test tests/api.test.cjs",
     "test:ui": "playwright test",

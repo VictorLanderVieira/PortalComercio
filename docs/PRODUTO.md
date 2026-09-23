@@ -36,6 +36,14 @@ Limites são conferidos no backend. Limpar uma foto permite substituí-la. Publi
 
 Cada publicação pode incluir uma imagem opcional, enviada em JPG, PNG ou WebP de até 5 MB. O servidor redimensiona a imagem para no máximo 1600 px no maior lado e a armazena como JPEG. Publicações sem imagem continuam válidas; a imagem não consome uma vaga adicional da galeria, mas a publicação continua sujeita ao limite mensal do plano.
 
+No mini site, a imagem da publicação aparece como miniatura lateral e abre ampliada ao clicar. Moradores podem criar uma conta gratuita sem cadastrar empresa para avaliar negócios com avaliações habilitadas; a regra de uma avaliação por conta e negócio permanece.
+
+O cadastro pode informar abertura e fechamento por dia, entrega e atendimento em domicílio. A busca filtra por esses dados e por promoções vigentes. Negócios sem horários estruturados não aparecem em “Aberto agora”; o texto livre de horários continua visível. A página da empresa mostra a data da última atualização informada pelo proprietário.
+
+Cada empresa tem uma página pública em `/empresa/{id}` com metadados próprios para compartilhamento, dados estruturados e inclusão no sitemap. A página só existe enquanto o cadastro puder aparecer publicamente; dados de contato seguem as mesmas restrições da API. A área interativa de avaliação permanece em `#!/empresa/{id}`.
+
+O painel do proprietário apresenta interações dos últimos 30 dias: visitas à página, cliques no WhatsApp, no mapa e nas ofertas. O contador desconsidera robôs conhecidos, administradores, o próprio dono e repetições próximas na mesma sessão. São sinais de interesse, não vendas confirmadas nem pessoas únicas. Os dados agregados não armazenam identidade dos visitantes.
+
 O plano não garante vendas, impressão mínima nem exclusividade por categoria. A ordenação padrão é prioridade do plano, média das avaliações e nome. O visitante pode selecionar melhor avaliação, ignorando a prioridade comercial. Avaliações vão de 1 a 5, requerem conta, são únicas por conta/empresa e não podem ser feitas pelo proprietário da vitrine.
 
 ## WhatsApp e autônomos

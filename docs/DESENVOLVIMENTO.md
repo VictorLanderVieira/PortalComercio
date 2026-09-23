@@ -7,11 +7,10 @@ Na pasta existente, com seu banco preservado:
 ~~~powershell
 cd C:\Pessoal\PortalComercio
 npm install
-php -d extension=pdo_sqlite scripts/migrate.php
 npm start
 ~~~
 
-Acesse http://localhost:8080 e http://localhost:8080/#!/admin. Use a conta administrativa já cadastrada. Ctrl+C no terminal encerra o servidor. Se a porta estiver ocupada, verifique se já há uma instância aberta antes de iniciar outra.
+`npm start` aplica somente as migrações pendentes antes de abrir o servidor; não recria o banco nem insere dados fictícios. Acesse http://localhost:8080 e http://localhost:8080/#!/admin. Use a conta administrativa já cadastrada. Ctrl+C no terminal encerra o servidor. Se a porta estiver ocupada, verifique se já há uma instância aberta antes de iniciar outra.
 
 ## Ambiente
 O arquivo privado .env deve usar APP_ENV=local, APP_URL=http://localhost:8080 e DB_DRIVER=sqlite. NOTIFICATION_MODE=manual mantém os avisos manuais. Não divulgue nem envie .env ao GitHub.

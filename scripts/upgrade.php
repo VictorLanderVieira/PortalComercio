@@ -38,3 +38,7 @@ if(!one('SELECT version FROM schema_migrations WHERE version=16')){db()->exec(fi
 if(!one('SELECT version FROM schema_migrations WHERE version=17')){db()->exec(file_get_contents(ROOT.'/database/017-review-moderation.sql'));query('INSERT INTO schema_migrations VALUES(17,?)',[date('Y-m-d H:i:s')]);echo "Moderação de avaliações adicionada.\n";}
 
 if(!one('SELECT version FROM schema_migrations WHERE version=18')){db()->exec(file_get_contents(ROOT.'/database/018-post-image.sql'));query('INSERT INTO schema_migrations VALUES(18,?)',[date('Y-m-d H:i:s')]);echo "Imagem opcional nas publicações adicionada.\n";}
+
+if(!one('SELECT version FROM schema_migrations WHERE version=19')){db()->exec(file_get_contents(ROOT.'/database/019-business-metrics.sql'));query('INSERT INTO schema_migrations VALUES(19,?)',[date('Y-m-d H:i:s')]);echo "Indicadores por empresa adicionados.\n";}
+
+if(!one('SELECT version FROM schema_migrations WHERE version=20')){db()->exec(file_get_contents(ROOT.'/database/020-discovery-fields.sql'));query('INSERT INTO schema_migrations VALUES(20,?)',[date('Y-m-d H:i:s')]);echo "Horários e formas de atendimento adicionados.\n";}
