@@ -70,6 +70,7 @@ try {
   $b['photos']=$b['is_free']?[]:query('SELECT id,url FROM photos WHERE business_id=?',[$m[1]])->fetchAll();
   $b['reviews']=!$b['reviews_enabled']?[]:query('SELECT r.id,r.rating,r.comment,r.created_at,u.name FROM reviews r JOIN users u ON u.id=r.user_id WHERE r.business_id=? AND r.hidden_at IS NULL ORDER BY r.id DESC',[$m[1]])->fetchAll();
   $b['promotions']=businessPromotions((int)$m[1]);
+  $b['advertisements']=publicAdvertisements((int)$m[1]);
   $b['posts']=$b['is_free']?[]:query('SELECT id,title,body,image_url,created_at FROM posts WHERE business_id=? ORDER BY id DESC LIMIT 20',[$m[1]])->fetchAll(); jsonResponse($b);
  }
  if(preg_match('#^/api/businesses/(\d+)/reviews$#',$path,$m) && $method==='POST') {

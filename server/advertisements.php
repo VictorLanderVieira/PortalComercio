@@ -1,7 +1,7 @@
 <?php
 // Public ads never expose payment evidence or private account data.
-function publicAdvertisements(): array {
- $now=date('Y-m-d H:i:s');$rows=query("SELECT a.* FROM advertisements a JOIN businesses b ON b.id=a.business_id WHERE a.status='active' AND a.paid_at IS NOT NULL AND a.starts_at<=? AND a.expires_at>? AND b.status<>'suspended' AND b.approval_status='approved' ORDER BY a.id DESC",[$now,$now])->fetchAll();$items=[];
+function publicAdvertisements(?int $businessId=null): array {
+ $now=date('Y-m-d H:i:s');$params=[$now,$now];$businessFilter='';if($businessId!==null){$businessFilter=' AND a.business_id=?';$params[]=$businessId;}$rows=query("SELECT a.* FROM advertisements a JOIN businesses b ON b.id=a.business_id WHERE a.status='active' AND a.paid_at IS NOT NULL AND a.starts_at<=? AND a.expires_at>? AND b.status<>'suspended' AND b.approval_status='approved'$businessFilter ORDER BY a.id DESC",$params)->fetchAll();$items=[];
  foreach($rows as $a){$b=one('SELECT * FROM businesses WHERE id=?',[$a['business_id']]);if(!isListed($b))continue;$items[]=['id'=>$a['id'],'business_id'=>$b['id'],'business_code'=>businessCode((int)$b['id']),'business_name'=>$b['name'],'title'=>$a['title'],'description'=>$a['description'],'image_url'=>$a['image_url'],'logo_url'=>$a['logo_url'],'creative_mode'=>$a['creative_mode']??'manual','offer_price_cents'=>$a['offer_price_cents'],'phone'=>$b['phone'],'maps_url'=>$b['publish_address']?$b['maps_url']:'','address'=>$b['publish_address']?$b['address']:'','neighborhood'=>$b['neighborhood'],'listed'=>isListed($b),'expires_at'=>$a['expires_at']];}return $items;
 }
 function adMonthEnd(string $start): string {
