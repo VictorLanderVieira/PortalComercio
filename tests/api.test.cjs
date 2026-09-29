@@ -104,7 +104,16 @@ test('Portal: regras de negócio, segurança e fluxo completo',async t=>{
  await c.req('GET','/businesses/'+mine.id,null,404);assert.equal((await c.req('GET','/businesses')).some(x=>x.id===mine.id),false);
  await c.req('POST','/me/business',{...form,name:'Tentativa de reaprovação',approval_status:'approved'});
  assert.equal((await c.req('GET','/me/business')).approval_status,'rejected');
- const categories=(await c.req('GET','/catalog')).categories.map(c=>c.name);for(const n of ['Transporte','Mecânica','Studio de Tatuagem','Foto e filmagem'])assert.ok(categories.includes(n));
+ const categories=(await c.req('GET','/catalog')).categories.map(c=>c.name);for(const n of ['Transporte','Mecânica','Studio de Tatuagem','Foto e filmagem','Imóveis: venda e locação'])assert.ok(categories.includes(n));
+ });
+
+ await t.test('Categoria de imóveis aparece no cadastro e no filtro público',async()=>{
+  const catalog=await b.req('GET','/catalog');assert.equal(catalog.categories.find(c=>Number(c.id)===14)?.icon,'building');
+  const owner=new Client();await owner.register('Imobiliária teste','imoveis@test.local');
+  await owner.req('POST','/me/business',{...form,name:'Imobiliária local',category_id:14,plan_id:4,interest_plan_id:4});
+  const business=await owner.req('GET','/me/business');await admin.req('POST','/admin/businesses/'+business.id+'/approve',{reason:'Cadastro revisado no teste'});
+  const matches=await b.req('GET','/businesses?category=14');assert.ok(matches.some(x=>Number(x.id)===Number(business.id)));
+  assert.equal((await b.req('GET','/businesses/'+business.id)).category,'Imóveis: venda e locação');
  });
 
  await t.test('Bairros: aceita a lista de Sarzedo e bloqueia texto livre em novo cadastro',async()=>{
