@@ -5,7 +5,7 @@
   "scripts": {
     "setup": "node scripts/assets.cjs && php -d extension=pdo_sqlite scripts/migrate.php && php -d extension=pdo_sqlite scripts/seed.php && php -d extension=pdo_sqlite scripts/demo.php && php scripts/icons.php",
     "prestart": "php -d extension=pdo_sqlite scripts/migrate.php",
-    "start": "php -d extension=pdo_sqlite -S localhost:8080 -t public server/router.php",
+    "start": "php -d extension=pdo_sqlite -d upload_max_filesize=5M -d post_max_size=70M -S localhost:8080 -t public server/router.php",
     "test": "php -d extension=pdo_sqlite tests/payment-unit.php && node --test tests/api.test.cjs",
     "test:ui": "playwright test",
     "build": "node scripts/assets.cjs && php scripts/icons.php",

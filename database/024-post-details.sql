@@ -1,0 +1,2 @@
+ALTER TABLE posts ADD COLUMN listing_type VARCHAR(20) NOT NULL DEFAULT 'novidade';
+ALTER TABLE posts ADD COLUMN price_cents INTEGER NULL;

@@ -73,9 +73,15 @@ Em Valores dos planos, configure mensalidade normal ou habilite promoção com p
 
 ## Plano Free e vencimento (19/09/2026)
 
-Free: R$ 0, cadastro básico com descrição, contatos, mapas e redes sociais; imagem padrão, zero uploads, galeria, publicações, promoções e avaliações. Visível por 30 dias corridos desde created_at. Suspensão administrativa prevalece.
+Free: R$ 0, cadastro básico com descrição, contatos, mapas e redes sociais; imagem padrão e sem fotos na galeria. Permite 1 publicação com até 1 foto própria durante os 30 dias de validade, sem promoções ou avaliações. Visível por 30 dias corridos desde created_at. Suspensão administrativa prevalece.
 
-Essencial: 5 fotos, 2 publicações/mês, avaliações e prioridade sobre Free. Destaque: 12 fotos, 8 publicações/mês, 2 promoções simultâneas e segunda prioridade. Premium: 25 fotos, 20 publicações/mês, 5 promoções e primeira prioridade. Valores pagos continuam configuráveis no administrativo.
+Em Fotos e identidade, a biblioteca de capas é exibida em uma linha rolável. Há uma imagem padrão específica para imobiliárias e imóveis, selecionável pelo proprietário e usada automaticamente na categoria “Imóveis: venda e locação” quando não houver outra escolha.
+
+Essencial: 5 fotos na galeria, 2 publicações/mês com até 4 fotos cada, avaliações e prioridade sobre Free. Destaque: 12 fotos na galeria, 8 publicações/mês com até 6 fotos cada, 2 promoções simultâneas e segunda prioridade. Premium: 25 fotos na galeria, 20 publicações/mês com até 12 fotos cada, 5 promoções e primeira prioridade. Valores pagos continuam configuráveis no administrativo.
+
+Em Minha Conta → Publicações, o proprietário pode selecionar fotos em etapas, definir a capa antes de publicar e informar tipo (novidade, produto, serviço ou imóvel) e preço opcional. Após publicar, pode acrescentar ou remover fotos e escolher outra como capa até o limite do plano, sem excluir nem recriar a publicação. A capa escolhida aparece no card e no mini site. O proprietário não pode excluir a publicação para reutilizar a cota. A publicidade avulsa ocupa uma faixa de destaque própria acima da busca na página inicial. As ofertas incluídas nos planos aparecem em um carrossel compacto ao lado da busca, com botão visível para a página completa. No celular, os blocos são empilhados sem rolagem horizontal.
+
+A página pública `/ofertas` reúne as promoções ativas em cards, com busca, filtros de categoria e bairro, opções de ver publicações do dia, negócios abertos agora, que fazem entrega ou atendem em domicílio, e ordenação por prioridade do plano, data de publicação ou proximidade do vencimento. O link tem metadados para compartilhamento em grupos; o carrossel de ofertas da página inicial permanece disponível.
 
 Ao terminar o maior prazo de pagamento, degustação ou cortesia, a vitrine paga aparece como Free por 5 dias desde esse vencimento. Depois sai da busca. Não altera plan_id nem apaga fotos, publicações, promoções ou avaliações. Pagamento confirmado restaura os benefícios do plano contratado; promoções continuam sujeitas à própria validade.
 

@@ -4,7 +4,9 @@ $requestLock=fopen(ROOT.'/storage/requests.lock','c');if(!$requestLock||!flock($
 if(is_file(ROOT.'/storage/maintenance.flag')){header('Retry-After: 60');jsonResponse(['error'=>'Portal em atualização. Tente novamente em instantes.'],503);}
 require __DIR__.'/payments.php';
 require __DIR__.'/ad-orders.php';
+require __DIR__.'/instagram-ads.php';
 require __DIR__.'/features.php';
+require __DIR__.'/posts.php';
 require __DIR__.'/advertisements.php';
 require __DIR__.'/finance.php';
 require __DIR__.'/google.php';
@@ -71,7 +73,7 @@ try {
   $b['reviews']=!$b['reviews_enabled']?[]:query('SELECT r.id,r.rating,r.comment,r.created_at,u.name FROM reviews r JOIN users u ON u.id=r.user_id WHERE r.business_id=? AND r.hidden_at IS NULL ORDER BY r.id DESC',[$m[1]])->fetchAll();
   $b['promotions']=businessPromotions((int)$m[1]);
   $b['advertisements']=publicAdvertisements((int)$m[1]);
-  $b['posts']=$b['is_free']?[]:query('SELECT id,title,body,image_url,created_at FROM posts WHERE business_id=? ORDER BY id DESC LIMIT 20',[$m[1]])->fetchAll(); jsonResponse($b);
+  $postLimit=$b['is_free']?1:20;$b['posts']=postsWithImages(query('SELECT id,title,body,image_url,listing_type,price_cents,created_at FROM posts WHERE business_id=? ORDER BY id DESC LIMIT '.$postLimit,[$m[1]])->fetchAll(),$b['is_free']?1:null); jsonResponse($b);
  }
  if(preg_match('#^/api/businesses/(\d+)/reviews$#',$path,$m) && $method==='POST') {
   $u=user(); $b=one('SELECT * FROM businesses WHERE id=?',[$m[1]]); if(!$b || !isLive($b) || !isListed($b)) fail('Comércio indisponível.',404);
@@ -83,7 +85,7 @@ try {
  }
  if($path==='/api/me/business' && $method==='GET') {
   $u=user(); $b=one('SELECT * FROM businesses WHERE user_id=?',[$u['id']]);
-  if($b){$b['business_code']=businessCode((int)$b['id']);$b['free_cover_url']=freeCoverUrl($b);$b['is_free']=isFreeBusiness($b);$b['display_free']=isFreeBusiness($b)||hasFreeDisplay($b);$b['display_until']=$b['display_free']?freeDisplayUntil($b):validUntil($b);$b['listed']=isListed($b);$b['suspended_by_expiry']=suspendedByExpiry($b);$b['visible']=isLive($b)&&isListed($b);$b['valid_until']=validUntil($b);$b['reviews']=query('SELECT r.id,r.rating,r.comment,r.created_at,u.name FROM reviews r JOIN users u ON u.id=r.user_id WHERE r.business_id=? AND r.hidden_at IS NULL ORDER BY r.id DESC',[$b['id']])->fetchAll();$b['promotions']=query('SELECT * FROM promotions WHERE business_id=? ORDER BY id DESC',[$b['id']])->fetchAll();$b['photos']=query('SELECT * FROM photos WHERE business_id=?',[$b['id']])->fetchAll();$b['posts']=query('SELECT * FROM posts WHERE business_id=? ORDER BY id DESC',[$b['id']])->fetchAll();$b['metrics_30d']=businessMetricSummary((int)$b['id']);$b['subscriptions']=query('SELECT s.*,p.name plan FROM subscriptions s JOIN plans p ON p.id=s.plan_id WHERE business_id=? ORDER BY id DESC',[$b['id']])->fetchAll();$b['payments']=query('SELECT p.* FROM payments p JOIN subscriptions s ON s.id=p.subscription_id WHERE s.business_id=? ORDER BY p.id DESC LIMIT 24',[$b['id']])->fetchAll();}
+  if($b){$b['business_code']=businessCode((int)$b['id']);$b['free_cover_url']=freeCoverUrl($b);$b['is_free']=isFreeBusiness($b);$b['display_free']=isFreeBusiness($b)||hasFreeDisplay($b);$b['display_until']=$b['display_free']?freeDisplayUntil($b):validUntil($b);$b['listed']=isListed($b);$b['suspended_by_expiry']=suspendedByExpiry($b);$b['visible']=isLive($b)&&isListed($b);$b['valid_until']=validUntil($b);$b['reviews']=query('SELECT r.id,r.rating,r.comment,r.created_at,u.name FROM reviews r JOIN users u ON u.id=r.user_id WHERE r.business_id=? AND r.hidden_at IS NULL ORDER BY r.id DESC',[$b['id']])->fetchAll();$b['promotions']=query('SELECT * FROM promotions WHERE business_id=? ORDER BY id DESC',[$b['id']])->fetchAll();$b['photos']=query('SELECT * FROM photos WHERE business_id=?',[$b['id']])->fetchAll();$b['posts']=postsWithImages(query('SELECT * FROM posts WHERE business_id=? ORDER BY id DESC',[$b['id']])->fetchAll());$b['metrics_30d']=businessMetricSummary((int)$b['id']);$b['subscriptions']=query('SELECT s.*,p.name plan FROM subscriptions s JOIN plans p ON p.id=s.plan_id WHERE business_id=? ORDER BY id DESC',[$b['id']])->fetchAll();$b['payments']=query('SELECT p.* FROM payments p JOIN subscriptions s ON s.id=p.subscription_id WHERE s.business_id=? ORDER BY p.id DESC LIMIT 24',[$b['id']])->fetchAll();}
   jsonResponse($b);
  }
  if(preg_match('#^/api/me/reviews/(\d+)$#',$path,$m) && $method==='DELETE') {
@@ -111,20 +113,16 @@ try {
   $b=business(); $p=one('SELECT * FROM photos WHERE id=? AND business_id=?',[$m[1],$b['id']]); if(!$p)fail('Foto não encontrada.',404); if(one('SELECT id FROM promotions WHERE business_id=? AND image_url=?',[$b['id'],$p['url']]))fail('Remova a promoção que utiliza esta imagem antes de excluir a foto.'); query('DELETE FROM photos WHERE id=?',[$p['id']]); if(preg_match('#^/uploads/[a-f0-9]{32}\.jpg$#',$p['url']))@unlink(ROOT.'/public'.$p['url']); jsonResponse(['ok'=>true]);
  }
  if($path==='/api/me/posts' && $method==='POST') {
-  $b=business(); if(!isLive($b))fail('Ative seu plano antes de publicar.'); $d=$_POST?:input(); $title=field($d,'title',3,100); $body=field($d,'body',10,1500);
-  $photo=$_FILES['photo']??null;$image=null;$url='';
-  if($photo){
-   if(!is_array($photo)||!is_int($photo['error']??null)||$photo['error']!==UPLOAD_ERR_OK||($photo['size']??0)>5*1024*1024)fail('Envie uma imagem JPG, PNG ou WebP de até 5 MB.');
-   $info=@getimagesize($photo['tmp_name']);if(!$info||!in_array($info['mime'],['image/jpeg','image/png','image/webp'],true)||$info[0]*$info[1]>25000000)fail('Imagem inválida ou superior a 25 megapixels.');
-   $source=@imagecreatefromstring(file_get_contents($photo['tmp_name']));if(!$source)fail('Não foi possível abrir a imagem.');
-   $scale=min(1,1600/max($info[0],$info[1]));$width=(int)round($info[0]*$scale);$height=(int)round($info[1]*$scale);
-   $image=imagecreatetruecolor($width,$height);imagefill($image,0,0,imagecolorallocate($image,255,255,255));imagecopyresampled($image,$source,0,0,0,0,$width,$height,$info[0],$info[1]);imagedestroy($source);
-   $url='/uploads/'.bin2hex(random_bytes(16)).'.jpg';
-  }
-  try{
-   transaction(function()use($b,$title,$body,$image,$url){lockBusiness((int)$b['id']);$plan=one('SELECT * FROM plans WHERE id=?',[$b['plan_id']]);$n=one('SELECT COUNT(*) n FROM posts WHERE business_id=? AND created_at>=?',[$b['id'],date('Y-m-01 00:00:00')]);if($n['n']>=$plan['post_limit'])fail('Limite mensal de publicações atingido.');if($image&&!imagejpeg($image,ROOT.'/public'.$url,85))fail('Não foi possível salvar a imagem.',500);query('INSERT INTO posts(business_id,title,body,image_url,created_at) VALUES(?,?,?,?,?)',[$b['id'],$title,$body,$url,date('Y-m-d H:i:s')]);});
-  }catch(Throwable $e){if($url&&is_file(ROOT.'/public'.$url))@unlink(ROOT.'/public'.$url);throw $e;}finally{if($image)imagedestroy($image);}
-  jsonResponse(['ok'=>true],201);
+  createBusinessPost(business(),$_POST?:input(),$_FILES);jsonResponse(['ok'=>true],201);
+ }
+ if(preg_match('#^/api/me/posts/(\d+)/photos$#',$path,$postMatch)&&$method==='POST') {
+  addPostPhotos(business(),(int)$postMatch[1],$_FILES);jsonResponse(['ok'=>true],201);
+ }
+ if(preg_match('#^/api/me/posts/(\d+)/photos/(\d+)$#',$path,$postMatch)&&$method==='DELETE') {
+  removePostPhoto(business(),(int)$postMatch[1],(int)$postMatch[2]);jsonResponse(['ok'=>true]);
+ }
+ if(preg_match('#^/api/me/posts/(\d+)/cover$#',$path,$postMatch)&&$method==='POST') {
+  $data=input();setPostCover(business(),(int)$postMatch[1],(int)($data['image_id']??0));jsonResponse(['ok'=>true]);
  }
  if($path==='/api/me/checkout' && $method==='POST') { $b=business(); $d=input(); jsonResponse(checkout($b,$d)); }
  if($path==='/api/me/cancel-subscription' && $method==='POST') {

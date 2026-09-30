@@ -9,8 +9,14 @@ if($path==='/sitemap.xml'){
  $rows=query('SELECT b.id FROM businesses b WHERE b.is_demo=0 AND '.visibilitySql('b').' ORDER BY b.id',visibilityParams())->fetchAll();
  echo '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
  echo '<url><loc>'.seoEscape($origin.'/').'</loc></url>';
+ echo '<url><loc>'.seoEscape($origin.'/ofertas').'</loc></url>';
  foreach($rows as $row)echo '<url><loc>'.seoEscape($origin.'/empresa/'.$row['id']).'</loc></url>';
  echo '</urlset>';exit;
+}
+if($path==='/ofertas'){
+ header('Content-Type: text/html; charset=utf-8');header('X-Content-Type-Options: nosniff');
+ $url=$origin.'/ofertas';$image=$origin.'/assets/promo-demo-destaque.svg';
+ echo '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ofertas de Sarzedo, MG | Guia Sarzedo</title><meta name="description" content="Veja ofertas ativas de empresas de Sarzedo, MG. Busque por categoria, bairro e empresa no Guia Sarzedo."><link rel="canonical" href="'.seoEscape($url).'"><meta property="og:type" content="website"><meta property="og:title" content="Ofertas de Sarzedo, MG | Guia Sarzedo"><meta property="og:description" content="Encontre promoções de empresas da cidade e compartilhe com seus vizinhos."><meta property="og:url" content="'.seoEscape($url).'"><meta property="og:image" content="'.seoEscape($image).'"><meta http-equiv="refresh" content="0;url=/#!/ofertas"></head><body><p>Veja as <a href="/#!/ofertas">ofertas de Sarzedo</a>.</p><script>location.replace("/#!/ofertas")</script></body></html>';exit;
 }
 if(!preg_match('#^/empresa/(\d+)$#',$path??'',$match)){http_response_code(404);exit;}
 $id=(int)$match[1];
@@ -18,7 +24,7 @@ $raw=one('SELECT b.*,c.name category,p.name plan,p.priority,p.promotion_limit FR
 if(!$raw||!isListed($raw)||$raw['is_demo']){http_response_code(404);header('Content-Type: text/plain; charset=utf-8');echo 'Empresa não encontrada.';exit;}
 $active=isLive($raw);$b=publicBusiness($raw);$now=date('Y-m-d H:i:s');
 $offers=$active&&!$b['is_free']?query('SELECT title,description,price_cents,original_price_cents,image_url,expires_at FROM promotions WHERE business_id=? AND starts_at<=? AND expires_at>? ORDER BY id DESC LIMIT '.(int)$raw['promotion_limit'],[$id,$now,$now])->fetchAll():[];
-$posts=$active&&!$b['is_free']?query('SELECT title,body,image_url,created_at FROM posts WHERE business_id=? ORDER BY id DESC LIMIT 10',[$id])->fetchAll():[];
+$posts=$b['contact_available']?query('SELECT title,body,image_url,created_at FROM posts WHERE business_id=? ORDER BY id DESC LIMIT '.($b['is_free']?1:10),[$id])->fetchAll():[];
 $reviews=$b['reviews_enabled']?query('SELECT r.rating,r.comment,r.created_at,u.name FROM reviews r JOIN users u ON u.id=r.user_id WHERE r.business_id=? AND r.hidden_at IS NULL ORDER BY r.id DESC LIMIT 10',[$id])->fetchAll():[];
 $ratingSummary=$b['reviews_enabled']?one('SELECT AVG(rating) rating,COUNT(*) count FROM reviews WHERE business_id=? AND hidden_at IS NULL',[$id]):null;
 $rating=$ratingSummary&&(int)$ratingSummary['count']>0?round((float)$ratingSummary['rating'],1):null;
