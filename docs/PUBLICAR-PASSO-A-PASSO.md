@@ -75,16 +75,16 @@ Exemplo de criação, já conectado ao SSH e após substituir o caminho pelo inf
 
 ~~~bash
 PORTAL_BASE=/home/USUARIO/domains/guiasarzedo.com.br/portal
-mkdir -p "$PORTAL_BASE/shared/storage" "$PORTAL_BASE/shared/uploads" "$PORTAL_BASE/incoming" "$PORTAL_BASE/releases" "$PORTAL_BASE/backups"
+mkdir -p "$PORTAL_BASE/shared/storage" "$PORTAL_BASE/public-uploads" "$PORTAL_BASE/incoming" "$PORTAL_BASE/releases" "$PORTAL_BASE/backups"
 ~~~
 
 Para o teste, repita com o caminho do subdomínio. Não use o mesmo PORTAL_BASE para ambos.
 
-Dentro de cada pasta portal, crie shared/storage, shared/uploads, incoming, releases e backups. Copie .env.production.example ou .env.staging.example como shared/.env, preenchendo o domínio e as credenciais do banco correspondente. Permissão do arquivo: 600. Não copie storage/integrations.json local: ele pode apontar ao Google localhost ou usar configurações de desenvolvimento.
+Dentro de cada pasta portal, crie shared/storage, public-uploads, incoming, releases e backups. `public-uploads` guarda apenas imagens públicas; o instalador cria o link de cada versão para ela. Mantenha `shared` privado para o banco e as credenciais. Copie .env.production.example ou .env.staging.example como shared/.env, preenchendo o domínio e as credenciais do banco correspondente. Permissão do arquivo: 600. Não copie storage/integrations.json local: ele pode apontar ao Google localhost ou usar configurações de desenvolvimento.
 
 A pasta pública do site deve apontar para portal/current/public. Em uma instalação NOVA, preserve primeiro a pasta pública padrão com outro nome (não apague conteúdo). Crie o link public_html apontando para portal/current/public. Esse link ficará sem destino até a primeira publicação. Se o painel restringir links simbólicos, peça ao suporte para configurar a raiz pública; não exponha o repositório inteiro como alternativa.
 
-O deploy cria versões em releases, mantém .env/storage/uploads em shared e troca current somente depois de verificar e migrar. Os caminhos da aplicação usam a raiz física da versão; não mova server ou .env para dentro de public_html.
+O deploy cria versões em releases, mantém .env/storage em shared e imagens em public-uploads, e troca current somente depois de verificar e migrar. Os caminhos da aplicação usam a raiz física da versão; não mova server ou .env para dentro de public_html.
 
 ## 6. Configurar GitHub Actions
 

@@ -10,7 +10,8 @@ expected="${2:-production}"
 [[ "$mode" == update || "$mode" == initialize ]] || { echo 'Modo inválido'; exit 1; }
 for command in php tar flock sha256sum readlink; do command -v "$command" >/dev/null; done
 [[ -f "$base/shared/.env" ]] || { echo 'Configure shared/.env antes de publicar.'; exit 1; }
-mkdir -p "$base/releases" "$base/backups" "$base/shared/storage" "$base/shared/uploads"
+mkdir -p "$base/releases" "$base/backups" "$base/shared/storage" "$base/shared/uploads" "$base/public-uploads"
+chmod 755 "$base/public-uploads"
 exec 9>"$base/deploy.lock"
 flock -n 9 || { echo 'Já existe uma publicação em andamento.'; exit 1; }
 [[ ! -e "$base/shared/storage/maintenance.flag" ]] || { echo 'Manutenção já ativa; verificar antes de continuar.'; exit 1; }
@@ -21,11 +22,16 @@ release="$base/releases/$(date -u +%Y%m%d%H%M%S)-$RANDOM"
 mkdir "$release"
 # Archive is produced only by the reviewed repository workflow.
 tar -xzf "$archive" --no-same-owner -C "$release"
-# Public dirs from package contain no uploaded files; preserve protection rule.
-cp "$release/public/uploads/.htaccess" "$base/shared/uploads/.htaccess"
+# Keep public images outside the private shared directory. The web server must
+# never need traversal rights to shared/. Migrate older images by copying only
+# the image format produced by the application; retain originals for recovery.
+find "$base/shared/uploads" -maxdepth 1 -type f -name '*.jpg' -exec cp -n -- {} "$base/public-uploads/" \;
+find "$base/public-uploads" -maxdepth 1 -type f -name '*.jpg' -exec chmod 644 -- {} +
+cp "$release/public/uploads/.htaccess" "$base/public-uploads/.htaccess"
+chmod 644 "$base/public-uploads/.htaccess"
 rm "$release/public/uploads/.htaccess"
 rmdir "$release/public/uploads" "$release/storage"
-ln -s "$base/shared/uploads" "$release/public/uploads"
+ln -s "$base/public-uploads" "$release/public/uploads"
 ln -s "$base/shared/storage" "$release/storage"
 ln -s "$base/shared/.env" "$release/.env"
 actual="$(php -r "require '$release/server/bootstrap.php';echo env('DEPLOY_ENV');")"
