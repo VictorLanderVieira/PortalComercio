@@ -155,3 +155,4 @@
 .hero-social{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-top:13px;font-size:12px;color:#61776a}
 .hero-social a{border:1px solid #d9e5d8;border-radius:999px;padding:4px 10px;color:#174d3c;font-weight:650}
 .hero-social a:hover{background:#edf2e9}
+.home-social-strip{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:12px 0;font-size:12px}.home-social-strip>span{font-weight:650;color:#536a59;margin-right:3px}.home-social-strip a{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 13px;border:1px solid #cddbc9;border-radius:999px;background:#f5f9f2;color:#174d3c;font-weight:700;white-space:nowrap}.home-social-strip a:hover{background:#e7f1e3;border-color:#8cac84}@media(max-width:600px){.home-social-strip{justify-content:center;flex-wrap:wrap;gap:7px;padding:10px 0}.home-social-strip>span{width:100%;text-align:center}.home-social-strip a{flex:1}}
